@@ -12,21 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 *Introduction à écrire*
 
-Pour évaluer la performance de nos modèles, nous introduisons la classique perte quadratique (RMSE), et également l'erreur absolue moyenne en pourcentage (MAPE).
 
-```{r}
-rmse <- function(eps)
-{
-  return(round(sqrt(mean(eps^2,na.rm=TRUE)), digits=0))
-}
-
-mape <- function(y,ychap)
-{
-  return(round(100*mean(abs(y-ychap)/abs(y)), digits=2))
-}
-```
-
-## Importation et prétraitement des données
+## 1 Importation et prétraitement des données
 
 ```{r packages, echo=FALSE, include=FALSE}
 library(tidyverse)
@@ -59,7 +46,7 @@ Les données que nous avons utilisées sont des données EDF, qui nous ont été
 d <- readRDS("Data_RTE_janv2012_oc2022.RDS")
 ```
 
-### Les principales variables du problème
+### 1.1 Les principales variables du problème
 
 Les variables que nous avons exploitées sont les suivantes.
 
@@ -88,7 +75,7 @@ Les variables que nous avons exploitées sont les suivantes.
     + **Temp_s95_max** : maximum des températures mesurées par les différentes stations météo, après lissage avec $\alpha = 0.95$
     + **Temp_s99_max** : maximum des températures mesurées par les différentes stations météo, après lissage avec $\alpha = 0.99$.
 
-### Analyse descriptive préliminaire
+### 1.2 Analyse descriptive préliminaire
 
 Commençons par afficher la consommation électrique sur un mois, par exemple avril 2012.
 
@@ -133,7 +120,7 @@ corrplot(cor(d_plot),
 
 La température (telle quelle ou lissée) apparaît comme étant très anticorrélée à la consommation, ce qui est naturel : lorsqu'il fait froid, les bâtiments sont chauffés, ce qui consomme beaucoup. L'effet de la climatisation lorsqu'il fait chaud compense un peu cette tendance, mais implique une augmentation moindre de la consommation. La consommation de la veille, **Load.48**, est au contraire très corrélée à **Load**. Quant à **tod** et **toy**, elles sont assez faiblement corrélées à **Load** car la tendance s'inverse au fil de leur augmentation : par exemple pour **toy**, la corrélation est d'abord négative, car plus on s'éloigne de janvier et plus les températures remontent, induisant une baisse de la consommation, mais dès que l'automne puis l'hiver reviennent, la corrélation devient positive, et les deux effets se compensent.
 
-### Découpage du jeu de données
+### 1.3 Découpage du jeu de données
 
 En vue d'appliquer des modèles d'apprentissage, il nous faut séparer les données qui ont été obtenues dans des conditions trop différentes, pour que l'hypothèse de données identiquement distribuées soit raisonnablement satisfaite. Tout d'abord, les données de la période covid (notamment celles de l'année 2020) ne peuvent vraisemblablement pas être traitées comme celles des années précédentes. Nous choisissons donc comme ensemble d'entraînement la période de 2012 à 2018 inclus, et l'année 2019 sert d'ensemble de validation. Nous enlevons ensuite les jours fériés, qui correspondent à un changement ponctuel de la consommation, et nous séparons les jours ouvrés des week-ends, en vertu des observations réalisées dans la sous-partie précédente.
 
@@ -186,14 +173,29 @@ for(i in c(1:H))
 ```
 
 
+## 2 Évaluation des modèles : quelques repères
 
-
-## Forêts aléatoires
-
-Nous utilisons le package *ranger* pour entraîner un modèle de forêt aléatoire par heure, pour les jours ouvrés et les week-ends séparément. 
+Pour évaluer la performance de nos modèles, nous introduisons la classique perte quadratique (RMSE), et également l'erreur absolue moyenne en pourcentage (MAPE).
 
 ```{r}
-formule_1 <- "Load ~Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp"
+rmse <- function(eps)
+{
+  return(round(sqrt(mean(eps^2,na.rm=TRUE)), digits=0))
+}
+
+mape <- function(y,ychap)
+{
+  return(round(100*mean(abs(y-ychap)/abs(y)), digits=2))
+}
+```
+
+## 3 Forêts aléatoires
+
+Nous utilisons le package *ranger* pour entraîner un modèle de forêt aléatoire par heure, pour les jours ouvrés et les week-ends séparément. Nous mettons toutes les variables explicatives potentiellement pertinentes dans le modèle.
+
+```{r}
+# jours ouvrés
+formule_1 <- "Load ~ Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp"
 
 # calcul des modèles
 for(i in c(1:H))
@@ -214,7 +216,7 @@ for(i in c(1:H))
   mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_foret_ouvre", i, sep="_")))$predictions))
 }
 
-mape_ouvre  # max = 1.70, min = 1.38 
+mape_ouvre
 
 ```
 
