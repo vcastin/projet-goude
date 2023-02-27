@@ -1,0 +1,220 @@
+---
+title: "Prédire la consommation électrique en France"
+subtitle: Projet ML pour la prévision, encadré par Yannig Goude
+output: html_document
+author: Guillaume Principato et Valérie Castin
+date: "15/03/22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Introduction à écrire*
+
+Pour évaluer la performance de nos modèles, nous introduisons la classique perte quadratique (RMSE), et également l'erreur absolue moyenne en pourcentage (MAPE).
+
+```{r}
+rmse <- function(eps)
+{
+  return(round(sqrt(mean(eps^2,na.rm=TRUE)), digits=0))
+}
+
+mape <- function(y,ychap)
+{
+  return(round(100*mean(abs(y-ychap)/abs(y)), digits=2))
+}
+```
+
+## Importation et prétraitement des données
+
+```{r packages, echo=FALSE, include=FALSE}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(lubridate)
+library(xts)
+library(mgcv)
+library(mgcViz)
+library(gridExtra)
+library(yarrr)
+library(qgam)
+library(magrittr)
+library(rpart)
+library(party)
+library(tree)
+library(rpart.plot)
+library(progress)
+library(plotmo)
+library(caret)
+library(randomForest)
+library(ranger)
+library(opera)
+library(corrplot)
+```
+
+Les données que nous avons utilisées sont des données EDF, qui nous ont été fournies directement par Yannig Goude. Nous avons donc pu nous concentrer sur les modèles sans avoir à nettoyer la base de données. Elles concernent la consommation électrique globale française (particuliers, entreprises et bâtiments publics confondus), échantillonnée par demi-heure de janvier 2012 à octobre 2022. Il y a en tout 24 variables, ce qui fait un total de $4.5\times 10^{6}$ observations.
+
+```{r donnees}
+d <- readRDS("Data_RTE_janv2012_oc2022.RDS")
+```
+
+### Les principales variables du problème
+
+Les variables que nous avons exploitées sont les suivantes.
+
+  - Variables temporelles
+    + **tod** : time of day, valeur numérique entre 0 et 1 indiquant le moment de la journée
+    + **toy** : time of year, valeur numérique entre 0 et 1 indiquant le moment de l'année
+    + **Month** : chaîne de caractères indiquant le mois
+    + **WeekDays** : chaîne de caractères indiquant le jour de la semaine
+    + **BH** : 1 si l'on est un jour férié, 0 sinon
+    + **DLS** : 1 si l'on est en heure d'hiver, 0 sinon
+    + **Summer_break** : variable à deux niveaux (0 et 10) pour indiquer les vacances d'été
+    + **Christmas_break** : variable à deux niveaux (0 et 20) pour indiquer les vacances de Noël
+    
+  - Variables de consommation électrique (valeurs numériques)
+    + **Load** : consommation dans toute la France échantillonnée au pas demi-heure
+    + **Load.48** : consommation 24 heures (soit 48 demi-heures) avant
+  - Prévisions RTE (valeurs numériques)
+    + **Forecast_RTE_dayahead** : prévision de la consommation réalisée la veille (entre 18h et 20h) par RTE pour le lendemain
+    + **Forecast_RTE_intraday** : prévision de la consommation réalisée une heure avant par RTE
+  - Variables liées à la température (valeurs numériques)
+    + **Temp** : température moyenne mesurée par un ensemble de stations météo en France métropolitaine
+    + **Temp_s95** : lissage exponentiel de Temp, avec un facteur de lissage $\alpha = 0.95$
+    + **Temp_s99** : lissage exponentiel de Temp, avec un facteur de lissage $\alpha = 0.99$
+    + **Temp_s95_min** : minimum des températures mesurées par les différentes stations météo, après lissage avec $\alpha = 0.95$
+    + **Temp_s99_min** : minimum des températures mesurées par les différentes stations météo, après lissage avec $\alpha = 0.99$
+    + **Temp_s95_max** : maximum des températures mesurées par les différentes stations météo, après lissage avec $\alpha = 0.95$
+    + **Temp_s99_max** : maximum des températures mesurées par les différentes stations météo, après lissage avec $\alpha = 0.99$.
+
+### Analyse descriptive préliminaire
+
+Commençons par afficher la consommation électrique sur un mois, par exemple avril 2012.
+
+```{r, echo=FALSE, include=TRUE}
+n <- 48*(59+32)
+m <- 48*(59+32+30)
+d_plot <- d[n:m,]
+plot(d_plot$Date, d_plot$Load, xlab = "Jour (avril 2012)", ylab = "Consommation (MWh)", type="l")
+```
+
+
+On observe plusieurs périodicités dans la série temporelle :
+
+- des oscillations journalières, de période 24h, avec des pics de consommation à certaines heures
+- une périodicité hebdomadaire, avec une nette différence entre les jours ouvrés et les week-ends (ceux-ci coïncidant avec une consommation plus faible).
+
+On s'attend aussi à avoir une périodicité annuelle. Pour la voir, nous représentons la consommation entre 2012 et 2014 pour un jour de la semaine fixé (par exemple le mardi) à une heure donnée (ici 12h), sinon il y a trop de données pour que les courbes soient lisibles.
+
+```{r, echo=FALSE, include=TRUE}
+d_plot <- filter(d, Year >= 2013 & Year <= 2016 & WeekDays == "Tuesday" & tod == 24)
+plot(d_plot$Date, d_plot$Load, xlab = "Mardi à 12h", ylab = "Consommation (MWh)", type="l")
+```
+
+On voit que la consommation est nettement plus importante l'hiver, et on retrouve les vacances d'été et les vacances de Noël en creux.
+
+Ces observations nous incitent à traiter différemment chaque heure de la journée, et à distinguer les jours ouvrés des jours fériés, ce que nous faisons dans la sous-partie suivante. Quelles sont ensuite les variables explicatives les plus pertinentes pour prédire la consommation ? Nous ferons une étude plus approfondie dans la partie sur les forêts aléatoires, en nous fondant sur l'importance des variables, mais nous pouvons dans un premier temps afficher la corrélation entre les variables.
+
+```{r, echo = FALSE, include = TRUE}
+d_plot <- select(d, Load, Load.48, Temp, Temp_s95, tod, toy, Year)
+d_plot <- filter(d_plot, Year <= 2019)
+d_plot <- select(d_plot, Load, Load.48, Temp, Temp_s95, tod, toy)
+colnames(d_plot) <- c("Load", "Load.48", "Temp", "Temp_s95", "tod", "toy")
+corrplot(cor(d_plot), 
+        type = "upper",
+        method = "circle",
+        order = "hclust",
+        hclust.method = "ward.D",
+        title = "Corrélation des variables (période 2012 - 2019)",
+        mar = c(2, 1, 3, 1))
+
+```
+
+La température (telle quelle ou lissée) apparaît comme étant très anticorrélée à la consommation, ce qui est naturel : lorsqu'il fait froid, les bâtiments sont chauffés, ce qui consomme beaucoup. L'effet de la climatisation lorsqu'il fait chaud compense un peu cette tendance, mais implique une augmentation moindre de la consommation. La consommation de la veille, **Load.48**, est au contraire très corrélée à **Load**. Quant à **tod** et **toy**, elles sont assez faiblement corrélées à **Load** car la tendance s'inverse au fil de leur augmentation : par exemple pour **toy**, la corrélation est d'abord négative, car plus on s'éloigne de janvier et plus les températures remontent, induisant une baisse de la consommation, mais dès que l'automne puis l'hiver reviennent, la corrélation devient positive, et les deux effets se compensent.
+
+### Découpage du jeu de données
+
+En vue d'appliquer des modèles d'apprentissage, il nous faut séparer les données qui ont été obtenues dans des conditions trop différentes, pour que l'hypothèse de données identiquement distribuées soit raisonnablement satisfaite. Tout d'abord, les données de la période covid (notamment celles de l'année 2020) ne peuvent vraisemblablement pas être traitées comme celles des années précédentes. Nous choisissons donc comme ensemble d'entraînement la période de 2012 à 2018 inclus, et l'année 2019 sert d'ensemble de validation. Nous enlevons ensuite les jours fériés, qui correspondent à un changement ponctuel de la consommation, et nous séparons les jours ouvrés des week-ends, en vertu des observations réalisées dans la sous-partie précédente.
+
+```{r}
+d_ent <- filter(d, Year<=2018) # on entraîne entre 2012 et 2018
+d_test <- filter(d, Year==2019) # on teste sur 2019
+
+# on enlève les jours fériés
+d_ent <- filter(d_ent, BH == 0)
+d_test <- filter(d_test, BH == 0)
+
+# on distingue les jours ouvrés des week-ends
+d_ent_ouvre <- filter(d_ent, WeekDays != "Saturday" & WeekDays != "Sunday")
+d_test_ouvre <- filter(d_test, WeekDays != "Saturday" & WeekDays != "Sunday")
+
+d_ent_we <- filter(d_ent, WeekDays =="Saturday" | WeekDays == "Sunday")
+d_test_we <- filter(d_test, WeekDays =="Saturday" | WeekDays == "Sunday")
+```
+
+Pour avoir des modèles aussi précis que possible, mais aussi alléger le coût d'entraînement, puisque notre jeu de données est assez volumineux, nous avons entraîné un modèle différent par demi-heure. Nous avons sélectionné 24 demi-heures sur 48 (les premières demi-heures de chaque heure), pour faciliter l'affichage des résultats : cela ne change rien aux méthodes étudiées. Nous obtenons ainsi les jeux de données :
+
+- **d_ent_ouvre_i** pour $1\le i\le 24$, où l'on n'a gardé que les jours ouvrés dans **d_ent**, à l'heure $i$
+- **d_ent_we_i** pour $1\le i\le 24$, où l'on n'a gardé que les week-ends dans **d_ent**, à l'heure $i$
+- **d_test_ouvre_i** pour $1\le i\le 24$, où l'on n'a gardé que les jours ouvrés dans **d_test**, à l'heure $i$
+- **d_test_we_i** pour $1\le i\le 24$, où l'on n'a gardé que les week-ends dans **d_test**, à l'heure $i$.
+
+```{r, echo=FALSE, include=FALSE}
+# construction d'un data frame par heure
+H <- 24
+
+for(i in c(1:H))
+{
+  assign(paste("d_ent_ouvre", i, sep="_"),filter(d_ent_ouvre, tod==i)) # d_ent_ouvre_i
+}
+
+for(i in c(1:H))
+{
+  assign(paste("d_ent_we", i, sep="_"),filter(d_ent_we, tod==i)) # d_ent_we_i
+}
+
+for(i in c(1:H))
+{
+  assign(paste("d_test_ouvre", i, sep="_"),filter(d_test_ouvre, tod==i)) # d_test_ouvre_i
+}
+
+for(i in c(1:H))
+{
+  assign(paste("d_test_we", i, sep="_"),filter(d_test_we, tod==i)) # d_test_we_i
+}
+```
+
+
+
+
+## Forêts aléatoires
+
+Nous utilisons le package *ranger* pour entraîner un modèle de forêt aléatoire par heure, pour les jours ouvrés et les week-ends séparément. 
+
+```{r}
+formule_1 <- "Load ~Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp"
+
+# calcul des modèles
+for(i in c(1:H))
+{
+  assign(paste("foret_ouvre", i, sep="_"), ranger(formule_1, data=eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), importance = "permutation", num.trees = 100, mtry=6))
+}
+
+# calcul des prédictions
+for(i in c(1:H))
+{
+  assign(paste("pred_foret_ouvre", i, sep="_"), predict(eval(parse(text=paste("foret_ouvre", i, sep="_"))), data = eval(parse(text=paste("d_test_ouvre", i, sep="_")))))
+}
+
+# affichage des MAPE
+mape_ouvre <- c()
+for(i in c(1:H))
+{
+  mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_foret_ouvre", i, sep="_")))$predictions))
+}
+
+mape_ouvre  # max = 1.70, min = 1.38 
+
+```
+
