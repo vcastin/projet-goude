@@ -6,17 +6,25 @@ author: Guillaume Principato et Valérie Castin
 date: "15/03/22"
 ---
 
+<style>
+body {
+text-align: justify}
+</style>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 *Je vais remettre en forme pour que les figures soient plus jolies, pour l'instant c'est un premier jet*
+
 *Introduction à écrire*
 
 
 ## 1 Importation et prétraitement des données
 
 ```{r packages, echo=FALSE, include=FALSE}
+rm(list=objects())
+
 library(tidyverse)
 library(readr)
 library(dplyr)
@@ -42,11 +50,15 @@ library(corrplot)
 library(vip)
 
 set.seed(1)
+
+load("MODELES/forets_ouvre.rda")
+load("MODELES/forets_we.rda")
+load("MODELES/GAM.rda")
 ```
 
 Les données que nous avons utilisées sont des données EDF, qui nous ont été fournies directement par Yannig Goude. Nous avons donc pu nous concentrer sur les modèles sans avoir à nettoyer la base de données. Elles concernent la consommation électrique globale française (particuliers, entreprises et bâtiments publics confondus), échantillonnée par demi-heure de janvier 2012 à octobre 2022. Il y a en tout 24 variables, ce qui fait un total de $4.5\times 10^{6}$ observations.
 
-```{r donnees}
+```{r donnees, eval=FALSE, echo=TRUE}
 d <- readRDS("Data_RTE_janv2012_oc2022.RDS")
 ```
 
@@ -128,7 +140,7 @@ La température (telle quelle ou lissée) apparaît comme étant très anticorr�
 
 En vue d'appliquer des modèles d'apprentissage, il nous faut séparer les données qui ont été obtenues dans des conditions trop différentes, pour que l'hypothèse de données identiquement distribuées soit raisonnablement satisfaite. Tout d'abord, les données de la période covid (notamment celles de l'année 2020) ne peuvent vraisemblablement pas être traitées comme celles des années précédentes. Nous choisissons donc comme ensemble d'entraînement la période de 2012 à 2018 inclus, et l'année 2019 sert d'ensemble de validation. Nous enlevons ensuite les jours fériés, qui correspondent à un changement ponctuel de la consommation, et nous séparons les jours ouvrés des week-ends, en vertu des observations réalisées dans la sous-partie précédente.
 
-```{r}
+```{r, echo=TRUE, eval=TRUE}
 d_ent <- filter(d, Year<=2018) # on entraîne entre 2012 et 2018
 d_test <- filter(d, Year==2019) # on teste sur 2019
 
@@ -151,7 +163,7 @@ Pour avoir des modèles aussi précis que possible, mais aussi alléger le coût
 - **d_test_ouvre_i** pour $1\le i\le 24$, où l'on n'a gardé que les jours ouvrés dans **d_test**, à l'heure $i$,
 - **d_test_we_i** pour $1\le i\le 24$, où l'on n'a gardé que les week-ends dans **d_test**, à l'heure $i$.
 
-```{r, echo=FALSE, include=FALSE}
+```{r, eval=TRUE, echo=FALSE}
 # construction d'un data frame par heure
 H <- 24
 
@@ -185,7 +197,7 @@ $$\text{RMSE}(\varepsilon) = \sqrt{\frac{1}{T}\sum_{i=1}^T \varepsilon_i^2},$$
 et
 $$\text{MAPE}(Y,\hat{Y}) = 100 \times \frac{1}{T}\sum_{i=1}^T\left \lvert \frac{Y_i-\hat{Y}_i}{Y_i}\right \rvert.$$
 
-```{r, echo=FALSE, include=FALSE}
+```{r, eval=FALSE, echo=FALSE}
 rmse <- function(eps)
 {
   return(round(sqrt(mean(eps^2,na.rm=TRUE)), digits=0))
@@ -226,11 +238,11 @@ Soulignons que dans ses prévisions une heure à l'avance, RTE ne dispose que de
 
 ## 3 Forêts aléatoires
 
-Nous utilisons le package *ranger* pour entraîner un modèle de forêt aléatoire par heure, pour les jours ouvrés et les week-ends séparément. Nous mettons toutes les variables explicatives potentiellement pertinentes dans le modèle. 
+Un premier modèle assez adapté à notre problématique est celui des forêts aléatoires. Dans un premier temps, nous avons entraîné une forêt sur l'ensemble des données, sans la séparation des heures et des jours ouvrés/week-ends. Nous obtenons un MAPE de 1.8% sur les données test. Nous avons ensuite séparé les données conformément à la partie 1.3, et les résultats sont nettement meilleurs : c'est donc ce choix que nous développons dans cette partie. Nous avons utilisé le package *ranger*, et mis dans chaque modèle toutes les variables explicatives potentiellement pertinentes.
 
 ### 3.1 Choix des paramètres
 
-Les paramètres à choisir sont les suivants.
+Les paramètres à choisir pour définir nos forêts aléatoires sont les suivants.
 
 - **mtry** : nombre de variables sélectionnées à chaque nouvelle coupure dans les arbres. Nous réalisons une validation croisée sur le modèle **d_ent_ouvre_1**, les autres modèles se comportant de façon similaire, et choisissons **mtry** = 8, car la courbe est à peu près constante à partir de cette valeur.
 
@@ -296,7 +308,7 @@ knitr::include_graphics('FIGURES/choix_minnode_forets')
 ```
 
 
-- **num.trees** : nos données heure par heure n'étant pas très volumineuses, nous pouvons nous permettre de prendre un nombre d'arbres assez grand. Au vu de la courbe ci-dessous, nous choisissons de prendre 250 arbres.
+- **num.trees** : au vu de la courbe ci-dessous, nous choisissons de prendre 150 arbres, ce qui est un peu au-delà de la valeur où la courbe forme un coude, mais nous pouvons nous le permettre car nos jeux de données par heure ne sont pas très volumineux.
 
 ```{r, echo=FALSE, eval=FALSE}
 error_list <- c()
@@ -347,7 +359,7 @@ knitr::include_graphics('FIGURES/choix_ntree_forets')
 
 Une fois les paramètres choisis, nous pouvons entraîner nos modèles.
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 ##### jours ouvrés
 
 formule_1 <- "Load ~ Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp+Temp_s95_min+Temp_s95_max+Temp_s99_min+Temp_s99_max"
@@ -355,9 +367,11 @@ formule_1 <- "Load ~ Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summ
 # calcul des modèles
 for(i in c(1:H))
 {
-  assign(paste("foret_ouvre", i, sep="_"), ranger(formule_1, data=eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), importance = "permutation", num.trees = 250, mtry=8))
+  assign(paste("foret_ouvre", i, sep="_"), ranger(formule_1, data=eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), importance = "permutation", num.trees = 150, mtry=8))
 }
+```
 
+```{r, echo=FALSE}
 # calcul des prédictions
 for(i in c(1:H))
 {
@@ -419,16 +433,8 @@ lines(d_test_ouvre_1$toy, pred_foret_ouvre_1$predictions, col='red')
 
 Un code similaire pour le week-end donne comme MAPE :
 
-```{r, echo=FALSE, include=TRUE}
+```{r, echo=FALSE}
 ##### week-end
-
-formule_1 <- "Load ~ Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp"
-
-# calcul des modèles
-for(i in c(1:H))
-{
-  assign(paste("foret_we", i, sep="_"), ranger(formule_1, data=eval(parse(text=paste("d_ent_we", i, sep="_"))), importance = "permutation", num.trees = 250, mtry=8))
-}
 
 # calcul des prédictions
 for(i in c(1:H))
@@ -461,3 +467,28 @@ vip(foret_ouvre_1, num_features=13)
 ```
 
 On observe que la consommation de la veille et les différentes transformations de la température sont les variables déterminantes.
+
+## 4 Modèles additifs généralisés (GAM)
+
+Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. 
+
+```{r}
+################## Cubic regression
+
+# calcul des prédictions
+for(i in c(1:H))
+{
+  assign(paste("pred_ouvre", i, sep="_"), predict(eval(parse(text=paste("gam_ouvre_cr", i, sep="_"))), newdata = eval(parse(text=paste("d_test_ouvre", i, sep="_")))))
+}
+
+# affichage des MAPE
+mape_ouvre <- c()
+for(i in c(1:H))
+{
+  mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_ouvre", i, sep="_")))))
+}
+
+mape_ouvre  # max = 1.55, min = 1.33
+
+```
+
