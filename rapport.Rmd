@@ -211,7 +211,7 @@ mape <- function(y,ychap)
 
 Pour avoir une idée du positionnement de nos modèles en termes de performance, et de l'utilité de recourir au machine learning pour répondre à notre problème, nous pouvons nous comparer :
 
-- au modèle naïf *à faire : je pensais à Load.48, est-ce que tu aurais d'autres idées ?*
+- au modèle naïf *à faire : je pensais à Load.48, est-ce que tu aurais d'autres idées ? _Je pense que c'est effectivement bien de prendre Load.48*
 - aux prévisions RTE : sur le jeu de données test (année 2019), on calcule les MAPE suivants pour **Forecast_RTE_intraday** pour les jours ouvrés (en pourcentage, dans l'ordre croissant par heure)
 
 ```{r, echo=FALSE, include=TRUE}
@@ -235,6 +235,7 @@ mape_we_RTE
 ```
 
 Soulignons que dans ses prévisions une heure à l'avance, RTE ne dispose que de prévisions météo, alors que nos modèles exploitent des valeurs de température effective, ce qui joue à notre avantage.
+*c'est des prévisions une heure à l'avance ? c'est pas des prévisions qui sont toutes faites en même temps à minuit pour le lendemain ?*
 
 ## 3 Forêts aléatoires
 
@@ -470,7 +471,124 @@ On observe que la consommation de la veille et les différentes transformations 
 
 ## 4 Modèles additifs généralisés (GAM)
 
+###modèles variable par variable, pour optimiser la valeur de k
+
+On vient de voir les forêts aléatoires qui nous ont données des résultats satisfaisant mais on peut espérer avoir de meilleurs résultats avec des modèles GAM bien paramétrés. Pour ce faire, on va dans un premier temps effectuer un GAM variable par variable pour comprendre leur influence sur la consommation et pour déterminer le degré de liberté optimal pour bien décrire les données sans pour autant faire un modèle trop complexe (même si compte-tenu du nombre de données à disposition, le risque d'overfitting est assez réduit). Avec les forêts et l'importance des variables, on a une guideline pour choisir lesquelles traiter en premier. Cette partie étant purement explicative, nous ne nous limitons pas à un modèle par heure pour simplifier l'interpretation qui, de toute manière, ne change pas si on observait les 24 résidus à chaque fois.
+
+```{r, echo=FALSE}
+library(mgcv)
+library(mgcViz)
+library(gridExtra)
+library(yarrr)
+library(dygraphs)
+library(xts)
+library(tidyverse)
+library(lubridate)
+library(xts)
+```
+
+```{r, echo=FALSE}
+g0 <- gam(Load~s(Load.48, k=3, bs="cr"), data=d_ent_ouvre)
+plot(d_ent_ouvre$Load, g0$residuals, main = "Résidus pour g0", xlab = "Consommation (MWh)", ylab = "Résidus" )
+fit0 <- getViz(g0, nsim = 50)
+plot(sm(fit0, 1), n = 400 ) +labs(title="Lien entre Load.48 et la consommation",x="Load.48 (MWh)",y="Consommation (MWh)")+ l_points() + l_fitLine() + l_ciLine()
+
+```
+
+On a la confirmation que Load.48 est une feature essentielle pour la prévision puisque ce simple modèle (où f est une fonction quasi affine donc on peut prendre k=3) explique déjà 89% de la variance. Pour autant, les résidus ne semblent clairement pas suivre une loi normale centrée ce qui laisse présager d'amélioration.
+
+```{r, echo=FALSE}
+g2 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr"), data=d_ent_ouvre)
+fit2 <- getViz(g2, nsim = 50)
+plot(d_ent_ouvre$Load, g2$residuals, main="Résidus pour g2", xlab="Consommation (MWh)",ylab="Résidus", pch=16)
+plot(sm(fit2, 2), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title="Lien entre Temp_s95_max et la consommation",x="Temp_s95_max (MWh)",y="Consommation (MWh)")
+plot(sm(fit2, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title="Lien entre Temp_s99_max et la consommation",x="Temp_s95_max (MWh)",y="Consommation (MWh)")
+summary(g2)
+
+```
+On obtient un R2 de près de 92% donc l'amélioration est notable, d'autant plus qu'on reste avec des degrés de fonctions assez simple (k=5). Dans le prochain GAM, on ajoute toutes les données discrète (heures (via "time of the day") et jours)
+
+```{r, echo=FALSE}
+g3 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr"), data=d_ent_ouvre)
+plot(d_ent_ouvre$Load, g3$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
+fit3 <- getViz(g3, nsim = 50)
+summary(g3)
+```
+On obtient un R2 de plus de 97% et on remarque que même si on laisse un grand degré de liberté pour la dépendance en toy (k=48) cela n'améliore pas le modèle. Cela justifie le fait de faire un modèle par heure plutôt qu'un par demi-heure. 
+On traite à part le cas de toy puisque le degré de liberté est moins facilement paramétrable, on décide donc de trouver k par cross validation :
+```{r, echo=FALSE}
+univ<-function(k, block)
+{
+  g<- gam(Load~s(toy, k=k, bs="cr"), data=d_ent_ouvre[-block,])
+  forecast<-predict(g, newdata=d_ent_ouvre[block,])
+  return(d_ent_ouvre[block,]$Load-forecast)
+}
+
+Nblock<-10
+borne_block<-seq(1, nrow(d_ent_ouvre), length=Nblock+1)%>%floor
+block_list<-list()
+l<-length(borne_block)
+for(i in c(2:(l-1)))
+{
+  block_list[[i-1]] <- c(borne_block[i-1]:(borne_block[i]-1))
+}
+block_list[[l-1]]<-c(borne_block[l-1]:(borne_block[l]))
+
+K<-c(3:20)
+rmseK<-lapply(K, function(k){lapply(block_list, univ,k=k)%>%unlist%>%rmse} )
+plot(K, rmseK, type='b', pch=20)
+```
+On choisit donc k=14 par technique du coude. On réutilisera une cross-validation pour définir la base de spline que l'on va utiliser au final. Mais avant ça on calcul le gam final avec les degrés de liberté obtenus dans cette partie
+
+###premier modèle GAM (sans découpage heure par heure)
+
+```{r, echo=FALSE}
+equation<-Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+s(Temp_s95_min, k=5, bs="cr")+s(Temp_s99_min, k=5, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr")+s(toy,k=14)+Christmas_break+Summer_break
+
+gtot <- gam(equation, data=d_ent_ouvre)
+plot(d_ent_ouvre$Load, gtot$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
+fittot <- getViz(gtot, nsim = 50)
+summary(gtot)
+
+
+```
+On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un trop grand nombre de paramètres. De plus, les résidus semblent être bruité et ne plus réellement contenir d'information.
+
+```{r, echo=FALSE}
+gam.check(gtot) #Je peux faire en sorte de pas plot tout en faisant comme dans la partie sur les qgams
+```
+On peut tout de même chercher une amélioration en modifiant la base de spline et en les comparant par cross-validation : 
+
+###analyse plus fine : GAM avec découpage heure par heure
+
 Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. 
+
+```{r, echo=FALSE}
+univ<-function(k, block, bs)
+{
+  equationtot<-Load~s(Load.48, k=3, bs=bs)+s(Temp_s95_max, k=5, bs=bs)+s(Temp_s99_max, k=5, bs=bs)+s(Temp_s95_min, k=5, bs=bs)+s(Temp_s99_min, k=5, bs=bs)+s(Temp_s95, k=5, bs=bs)+s(Temp_s99, k=5, bs=bs)+WeekDays+s(tod, k=24, bs=bs)+s(toy,k=14,bs=bs)+Christmas_break+Summer_break
+  
+  gtot <- gam(equationtot, data=d_ent_ouvre[-block,])
+  forecast<-predict(gtot, newdata=d_ent_ouvre[block,])
+  return(2)
+  #return(d_ent_ouvre[block,]$Load-forecast)
+}
+
+K<-c(4:40)
+rmseKcr<-lapply(K, function(k){lapply(block_list, univ, k=k, bs="cr")%>%unlist%>%rmse} )
+rmseKtp<-lapply(K, function(k){lapply(block_list, univ, k=k, bs='tp')%>%unlist%>%rmse} )
+rmseKps<-lapply(K, function(k){lapply(block_list, univ, k=k, bs='ps')%>%unlist%>%rmse} )
+rmseKcs<-lapply(K, function(k){lapply(block_list, univ, k=k, bs='cs')%>%unlist%>%rmse} )
+
+par(mfrow=c(1,1))
+col<-piratepal("basel", length.out = 9)
+plot(K, rmseKcr, type='b', pch=20, ylim= range(rmseKcr, rmseKps), col=col[1])
+lines(K, rmseKtp, type='b', pch=20, col=col[2])
+lines(K, rmseKps, type='b', pch=20, col=col[3])
+lines(K, rmseKcs, type='b', pch=20, col=col[4])
+legend("top", col=col, c("cr", "tp", "ps", "cs"), pch=20, ncol=2, bty='n')
+```
+
 
 ```{r}
 ################## Cubic regression
