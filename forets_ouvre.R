@@ -80,7 +80,7 @@ for(i in c(1:H))
 
 
 
-save(list = ls(all = TRUE), file= "forets_ouvre.rda")
+save(list = ls(all = TRUE), file= "MODELES/forets_ouvre.rda")
 
 
 

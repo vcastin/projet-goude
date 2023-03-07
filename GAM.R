@@ -75,11 +75,7 @@ mape <- function(y,ychap)
 ################
 
 ################## Cubic regression
-#equation <- Load~s(Load.48, bs="cr")+s(Temp_s95, bs="cr")+s(Temp_s99, bs="cr")+s(Temp, bs="cr")+s(toy, bs="cr")+te(Load.48,Temp_s99)+WeekDays+DLS+Christmas_break+Summer_break
-equation <- Load~s(Load.48,k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+s(Temp, k=5, bs="cr")+s(toy, k=20, bs="cr")+te(Load.48,Temp_s99)+WeekDays+DLS+Christmas_break+Summer_break
-#equation <- Load~s(Load.48, bs="cr")+s(Temp_s95, bs="cr")+s(Temp_s99, bs="cr")+s(Temp, bs="cr")+s(toy, bs="cr")+te(toy,Temp)+WeekDays+DLS+Christmas_break+Summer_break
-# WeekDays est nettement meilleur que Lundi
-# on laisse R choisir les k tout seul (voir si la validation croisée améliore)
+equation <- Load~s(Load.48,k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+s(Temp, k=5, bs="cr")+s(toy, k=35, bs="cr")+te(Load.48,Temp_s99)+WeekDays+DLS+Christmas_break+Summer_break+s(Temp_s99_min, k=5)+s(Temp_s99_max, k=5)+s(Temp_s95_min, k=5)+s(Temp_s95_max, k=5)
 
 for(i in c(1:H))
 {
