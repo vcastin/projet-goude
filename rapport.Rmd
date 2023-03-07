@@ -48,6 +48,7 @@ library(ranger)
 library(opera)
 library(corrplot)
 library(vip)
+library(dygraphs)
 
 set.seed(1)
 
@@ -474,7 +475,6 @@ On observe que la consommation de la veille et les différentes transformations 
 
 ## 4 Modèles additifs généralisés (GAM)
 
-<<<<<<< HEAD
 Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. Nous utilisons des splines de régression cubique et l'équation suivante, où les degrés de liberté **k** ont été choisis à l'aide de la fonction **gam.check** sur le modèle **gam_ouvre_12**, en supposant que ces paramètres doivent être à peu près les mêmes pour chaque modèle.
 
 ```{r, eval=FALSE}
@@ -482,23 +482,11 @@ equation <- Load~s(Load.48,k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k
 ```
 
 
-```{r, echo=FALSE, include=TRUE}
-=======
-###modèles variable par variable, pour optimiser la valeur de k
+
+### Modèles variable par variable, pour optimiser la valeur de k
 
 On vient de voir les forêts aléatoires qui nous ont données des résultats satisfaisant mais on peut espérer avoir de meilleurs résultats avec des modèles GAM bien paramétrés. Pour ce faire, on va dans un premier temps effectuer un GAM variable par variable pour comprendre leur influence sur la consommation et pour déterminer le degré de liberté optimal pour bien décrire les données sans pour autant faire un modèle trop complexe (même si compte-tenu du nombre de données à disposition, le risque d'overfitting est assez réduit). Avec les forêts et l'importance des variables, on a une guideline pour choisir lesquelles traiter en premier. Cette partie étant purement explicative, nous ne nous limitons pas à un modèle par heure pour simplifier l'interpretation qui, de toute manière, ne change pas si on observait les 24 résidus à chaque fois.
 
-```{r, echo=FALSE}
-library(mgcv)
-library(mgcViz)
-library(gridExtra)
-library(yarrr)
-library(dygraphs)
-library(xts)
-library(tidyverse)
-library(lubridate)
-library(xts)
-```
 
 ```{r, echo=FALSE}
 g0 <- gam(Load~s(Load.48, k=3, bs="cr"), data=d_ent_ouvre)
@@ -529,7 +517,8 @@ summary(g3)
 ```
 On obtient un R2 de plus de 97% et on remarque que même si on laisse un grand degré de liberté pour la dépendance en toy (k=48) cela n'améliore pas le modèle. Cela justifie le fait de faire un modèle par heure plutôt qu'un par demi-heure. 
 On traite à part le cas de toy puisque le degré de liberté est moins facilement paramétrable, on décide donc de trouver k par cross validation :
-```{r, echo=FALSE}
+
+```{r, echo=FALSE, eval=FALSE}
 univ<-function(k, block)
 {
   g<- gam(Load~s(toy, k=k, bs="cr"), data=d_ent_ouvre[-block,])
@@ -553,7 +542,7 @@ plot(K, rmseK, type='b', pch=20)
 ```
 On choisit donc k=14 par technique du coude. On réutilisera une cross-validation pour définir la base de spline que l'on va utiliser au final. Mais avant ça on calcul le gam final avec les degrés de liberté obtenus dans cette partie
 
-###premier modèle GAM (sans découpage heure par heure)
+### Premier modèle GAM (sans découpage heure par heure)
 
 ```{r, echo=FALSE}
 equation<-Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+s(Temp_s95_min, k=5, bs="cr")+s(Temp_s99_min, k=5, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr")+s(toy,k=14)+Christmas_break+Summer_break
@@ -576,7 +565,7 @@ On peut tout de même chercher une amélioration en modifiant la base de spline 
 
 Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. 
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, eval=FALSE}
 univ<-function(k, block, bs)
 {
   equationtot<-Load~s(Load.48, k=3, bs=bs)+s(Temp_s95_max, k=5, bs=bs)+s(Temp_s99_max, k=5, bs=bs)+s(Temp_s95_min, k=5, bs=bs)+s(Temp_s99_min, k=5, bs=bs)+s(Temp_s95, k=5, bs=bs)+s(Temp_s99, k=5, bs=bs)+WeekDays+s(tod, k=24, bs=bs)+s(toy,k=14,bs=bs)+Christmas_break+Summer_break
@@ -603,7 +592,7 @@ legend("top", col=col, c("cr", "tp", "ps", "cs"), pch=20, ncol=2, bty='n')
 ```
 
 
-```{r}
+```{r, echo=FALSE}
 ################## Cubic regression
 
 # calcul des prédictions
