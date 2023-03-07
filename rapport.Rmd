@@ -54,6 +54,7 @@ set.seed(1)
 load("MODELES/forets_ouvre.rda")
 load("MODELES/forets_we.rda")
 load("MODELES/GAM.rda")
+load("MODELES/stacking.rda")
 ```
 
 Les données que nous avons utilisées sont des données EDF, qui nous ont été fournies directement par Yannig Goude. Nous avons donc pu nous concentrer sur les modèles sans avoir à nettoyer la base de données. Elles concernent la consommation électrique globale française (particuliers, entreprises et bâtiments publics confondus), échantillonnée par demi-heure de janvier 2012 à octobre 2022. Il y a en tout 24 variables, ce qui fait un total de $4.5\times 10^{6}$ observations.
@@ -387,12 +388,12 @@ for(i in c(1:H))
   mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_foret_ouvre", i, sep="_")))$predictions))
 }
 
-plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.7), lab=c(5,4,0))
+plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.7), lab=c(5,4,0), col="blue")
 lines(mape_ouvre_RTE, col="red")
-legend(x="bottomright", legend=c("foret","RTE"), col=c("black","red"), pch=c(0,15))
+legend(x="bottomright", legend=c("foret","RTE"), col=c("blue","red"), pch=c(15,15))
 ```
 
-Nous affichons l'attache aux données et la prédiction pour le modèle **d_ent_ouvre_1**. *Est-ce qu'on n'overfitte pas un peu ?*
+Nous affichons l'attache aux données et la prédiction pour le modèle **foret_ouvre_12**. *Est-ce qu'on n'overfitte pas un peu ?*
 
 ```{r, echo=FALSE, include=TRUE}
 # midi
@@ -425,10 +426,12 @@ d_plot_ouvre_1 <- filter(d_ent_ouvre_1, Year=="2018")
 f_plot_ouvre_1 <- predict(foret_ouvre_1, data = d_plot_ouvre_1)
 plot(d_plot_ouvre_1$toy, d_plot_ouvre_1$Load, main = "Entraînement jours ouvrés à midi", xlab = "Date (année 2018)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0))
 lines(d_plot_ouvre_1$toy, f_plot_ouvre_1$predictions, col='red')
+legend(x="bottomleft", legend=c("données","foret_ouvre_12"), col=c("black","red"), pch=c(15,15))
 
 # affichage sur les données test
 plot(d_test_ouvre_1$toy, d_test_ouvre_1$Load, main = "Validation jours ouvrés à midi", xlab = "Date (année 2019)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0))
 lines(d_test_ouvre_1$toy, pred_foret_ouvre_1$predictions, col='red')
+legend(x="bottomleft", legend=c("données","foret_ouvre_12"), col=c("black","red"), pch=c(15,15))
 ```
 
 Un code similaire pour le week-end donne comme MAPE :
@@ -452,9 +455,9 @@ for(i in c(1:H))
   mape_we <- c(mape_we, mape(eval(parse(text=paste("d_test_we", i, sep="_")))$Load, eval(parse(text=paste("pred_foret_we", i, sep="_")))$predictions))
 }
 
-plot(mape_we, main = "MAPE en fonction de l'heure, le week-end (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0))
+plot(mape_we, main = "MAPE en fonction de l'heure, le week-end (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
 lines(mape_ouvre_RTE, col="red")
-legend(x="bottomright", legend=c("foret","RTE"), col=c("black","red"), pch=c(0,15))
+legend(x="bottomright", legend=c("foret","RTE"), col=c("blue","red"), pch=c(15,15))
 
 ```
 
@@ -470,9 +473,14 @@ On observe que la consommation de la veille et les différentes transformations 
 
 ## 4 Modèles additifs généralisés (GAM)
 
-Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. 
+Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. Nous utilisons des splines de régression cubique et l'équation suivante, où les degrés de liberté **k** ont été choisis à l'aide de la fonction **gam.check** sur le modèle **gam_ouvre_12**, en supposant que ces paramètres doivent être à peu près les mêmes pour chaque modèle.
 
-```{r}
+```{r, eval=FALSE}
+equation <- Load~s(Load.48,k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+s(Temp, k=5, bs="cr")+s(toy, k=35, bs="cr")+te(Load.48,Temp_s99)+WeekDays+DLS+Christmas_break+Summer_break+s(Temp_s99_min, k=5)+s(Temp_s99_max, k=5)+s(Temp_s95_min, k=5)+s(Temp_s95_max, k=5)
+```
+
+
+```{r, echo=FALSE, include=TRUE}
 ################## Cubic regression
 
 # calcul des prédictions
@@ -488,7 +496,81 @@ for(i in c(1:H))
   mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_ouvre", i, sep="_")))))
 }
 
-mape_ouvre  # max = 1.55, min = 1.33
+# mape_ouvre  # max = 1.55, min = 1.33
+
+plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
+lines(mape_ouvre_RTE, col="red")
+legend(x="bottomright", legend=c("GAM","RTE"), col=c("blue","red"), pch=c(15,15))
 
 ```
+
+Nous affichons l'attache aux données et la prédiction pour le modèle **gam_ouvre_12**.
+
+```{r, echo=FALSE, include=TRUE}
+# midi
+
+rmse(d_test_ouvre_12$Load-pred_ouvre_12)
+mape(d_test_ouvre_12$Load,pred_ouvre_12)
+
+# affichage sur les données d'entraînement
+d_plot_ouvre_12 <- filter(d_ent_ouvre_12, Year=="2018")
+g_plot_ouvre_12 <- predict(gam_ouvre_cr_12, newdata = d_plot_ouvre_12)
+plot(d_plot_ouvre_12$toy, d_plot_ouvre_12$Load, main = "Entraînement jours ouvrés à midi", xlab = "Date (année 2018)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0))
+lines(d_plot_ouvre_12$toy, g_plot_ouvre_12, col='red')
+legend(x="bottomleft", legend=c("données","gam_ouvre_12"), col=c("black","red"), pch=c(15,15))
+
+# affichage sur les données test
+plot(d_test_ouvre_12$toy, d_test_ouvre_12$Load, main = "Validation jours ouvrés à midi", xlab = "Date (année 2019)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0))
+lines(d_test_ouvre_12$toy, pred_ouvre_12, col='red')
+legend(x="bottomleft", legend=c("données","gam_ouvre_12"), col=c("black","red"), pch=c(15,15))
+
+# affichage des différentes splines
+fit1 <- getViz(gam_ouvre_cr_12, nsim = 50)
+# ordre variables : Load48, Temp95, Temp99, Temp, toy
+par(mfrow = c(3,2))
+
+plot(sm(fit1, 1), n = 400) + l_points() + l_fitLine() + l_ciLine()
+plot(sm(fit1, 2), n = 400) + l_points() + l_fitLine() + l_ciLine()
+plot(sm(fit1, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()
+plot(sm(fit1, 4), n = 400) + l_points() + l_fitLine() + l_ciLine()
+plot(sm(fit1, 5), n = 400) + l_points() + l_fitLine() + l_ciLine()
+
+```
+
+```{r, echo=FALSE, include=TRUE}
+gam.check(gam_ouvre_cr_12)
+```
+
+*faire une figure avec attaches aux données et validation pour chaque type de modèle, pour pouvoir comparer*
+
+*mettre le code des figures à part*
+
+*étudier les résidus*
+
+## 5 Modèle mixte : stacking des GAM et des forêts
+
+```{r, echo=FALSE}
+for(i in c(1:H))
+{
+  assign(paste("pred_stack_ouvre", i, sep="_"), predict(eval(parse(text=paste("stack_ouvre", i, sep="_"))), data = eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))))
+}
+
+# affichage des MAPE
+mape_ouvre <- c()
+for(i in c(1:H))
+{
+  mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))$Load, eval(parse(text=paste("pred_stack_ouvre", i, sep="_")))$predictions))
+}
+
+# mape_ouvre
+
+plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
+lines(mape_ouvre_RTE, col="red")
+legend(x="bottomright", legend=c("GAM+forets","RTE"), col=c("blue","red"), pch=c(15,15))
+```
+
+
+
+
+
 
