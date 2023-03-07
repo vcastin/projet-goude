@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+arbres_cart.R
+boosting.R
+forets_aleatoires.R
+gam_propre.R
+*.html
