@@ -30,12 +30,24 @@ set.seed(1)
 
 d <- readRDS("DONNEES/Data_RTE_janv2012_oc2022.RDS") # données brutes
 
+# on encode WeekDays (jours ouvrés) par des indicatrices
+
+Lundi <- as.double(d$WeekDays == "Monday")
+Mardi <- as.double(d$WeekDays == "Tuesday")
+Mercredi <- as.double(d$WeekDays == "Wednesday")
+Jeudi <- as.double(d$WeekDays == "Thursday")
+Vendredi <- as.double(d$WeekDays == "Friday")
+
+d <- data.frame(d, Lundi, Mardi, Mercredi, Jeudi, Vendredi)
+
+d <- filter(d, BH == 0) # on enlève les jours fériés
+
 d_ent <- filter(d, Year<=2018) # on entraîne entre 2012 et 2018
-d_ent <- filter(d_ent, BH == 0) # on enlève les jours fériés
+d_test <- filter(d, Year==2019) # on teste sur 2019
 
 # on distingue les jours ouvrés des week-ends
 d_ent_ouvre <- filter(d_ent, WeekDays != "Saturday" & WeekDays != "Sunday")
-d_ent_we <- filter(d_ent, WeekDays =="Saturday" | WeekDays == "Sunday")
+d_test_ouvre <- filter(d_test, WeekDays != "Saturday" & WeekDays != "Sunday")
 
 # construction d'un data frame par heure
 H <- 24
@@ -47,7 +59,7 @@ for(i in c(1:H))
 
 for(i in c(1:H))
 {
-  assign(paste("d_ent_we", i, sep="_"),filter(d_ent_we, tod==i)) # d_ent_we_i
+  assign(paste("d_test_ouvre", i, sep="_"),filter(d_test_ouvre, tod==i))
 }
 
 rm(d)
