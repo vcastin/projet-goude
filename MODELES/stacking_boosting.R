@@ -226,5 +226,5 @@ rm(gam_ouvre_cr_22)
 rm(gam_ouvre_cr_23)
 rm(gam_ouvre_cr_24)
 
-save(list = ls(all = TRUE), file= "MODELES/stacking_forets.rda")
+save(list = ls(all = TRUE), file= "MODELES/stacking_boosting.rda")
 

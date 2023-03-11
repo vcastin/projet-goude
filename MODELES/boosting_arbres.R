@@ -146,3 +146,5 @@ plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019
 lines(mape_ouvre_RTE, col="red")
 lines(mape_ouvre_2, col="pink")
 legend(x="bottomright", legend=c("gbm","RTE", "xgb"), col=c("blue","red", "pink"), pch=c(15,15,15))
+
+save(list = ls(all = TRUE), file= "MODELES/boosting_arbres.rda")

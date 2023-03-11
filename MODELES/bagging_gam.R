@@ -69,6 +69,12 @@ n <- nrow(d_ent_ouvre_1)
 
 gam.bagg_1 <- bagging(Nbag, data_app=d_ent_ouvre_1, equation, size=floor(0.8*n))
 
+#### calcul des prédictions
+for(i in c(1:Nbag))
+{
+  assign(paste("pred_gam_bagg1", i, sep="_"), predict(gam.bagg_1[i], newdata = d_test_ouvre_1))
+}
+
 
 ######### sur d_ent_ouvre_12
 
@@ -80,5 +86,12 @@ n <- nrow(d_ent_ouvre_12)
 
 gam.bagg_12 <- bagging(Nbag, data_app=d_ent_ouvre_12, equation, size=floor(0.8*n))
 
+#### calcul des prédictions
+for(i in c(1:Nbag))
+{
+  assign(paste("pred_gam_bagg12", i, sep="_"), predict(gam.bagg_12[i], newdata = d_test_ouvre_12))
+}
+
 # sauvegarde
-save(gam.bagg_1, gam.bagg_12, file="MODELES/bagging_gam.rda")
+save(list = ls(all = TRUE), file= "MODELES/bagging_gam.rda")
+

@@ -30,43 +30,6 @@ library(vip)
 
 set.seed(1)
 
-d <- readRDS("Data_RTE_janv2012_oc2022.RDS")
-
-d_ent <- filter(d, Year<=2018) # on entraîne entre 2012 et 2018
-d_test <- filter(d, Year==2019) # on teste sur 2019
-
-# on enlève les jours fériés
-d_ent <- filter(d_ent, BH == 0)
-d_test <- filter(d_test, BH == 0)
-
-# on distingue les jours ouvrés des week-ends
-d_ent_ouvre <- filter(d_ent, WeekDays != "Saturday" & WeekDays != "Sunday")
-d_test_ouvre <- filter(d_test, WeekDays != "Saturday" & WeekDays != "Sunday")
-
-d_ent_we <- filter(d_ent, WeekDays =="Saturday" | WeekDays == "Sunday")
-d_test_we <- filter(d_test, WeekDays =="Saturday" | WeekDays == "Sunday")
-
-H <- 24
-
-for(i in c(1:H))
-{
-  assign(paste("d_ent_ouvre", i, sep="_"),filter(d_ent_ouvre, tod==i)) # d_ent_ouvre_i
-}
-
-for(i in c(1:H))
-{
-  assign(paste("d_ent_we", i, sep="_"),filter(d_ent_we, tod==i)) # d_ent_we_i
-}
-
-for(i in c(1:H))
-{
-  assign(paste("d_test_ouvre", i, sep="_"),filter(d_test_ouvre, tod==i)) # d_test_ouvre_i
-}
-
-for(i in c(1:H))
-{
-  assign(paste("d_test_we", i, sep="_"),filter(d_test_we, tod==i)) # d_test_we_i
-}
 
 load("MODELES/GAM.rda")
 
@@ -118,6 +81,13 @@ for(i in c(1:H))
 {
   assign(paste("stack_ouvre", i, sep="_"), ranger(formule_2, data=eval(parse(text=paste("d_ent_ouvre_bis", i, sep="_"))), importance = "permutation", num.trees = 150, mtry=10))
 }
+
+# calcul des prédictions
+for(i in c(1:H))
+{
+  assign(paste("pred_stack_ouvre", i, sep="_"), predict(eval(parse(text=paste("stack_ouvre", i, sep="_"))), data = eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))))
+}
+
 
 rm(pred_ouvre_1)
 rm(pred_ouvre_2)

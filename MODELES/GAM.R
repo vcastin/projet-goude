@@ -33,30 +33,7 @@ library(vip)
 
 set.seed(1)
 
-d <- readRDS("Data_RTE_janv2012_oc2022.RDS")
-
-d_ent <- filter(d, Year<=2018) # on entraîne entre 2012 et 2018
-
-# on enlève les jours fériés
-d_ent <- filter(d_ent, BH == 0)
-
-# on distingue les jours ouvrés des week-ends
-d_ent_ouvre <- filter(d_ent, WeekDays != "Saturday" & WeekDays != "Sunday")
-
-d_ent_we <- filter(d_ent, WeekDays =="Saturday" | WeekDays == "Sunday")
-
-# construction d'un data frame par heure
-H <- 24
-
-for(i in c(1:H))
-{
-  assign(paste("d_ent_ouvre", i, sep="_"),filter(d_ent_ouvre, tod==i)) # d_ent_ouvre_i
-}
-
-for(i in c(1:H))
-{
-  assign(paste("d_ent_we", i, sep="_"),filter(d_ent_we, tod==i)) # d_ent_we_i
-}
+load("DONNEES/data.rda")
 
 # mesures d'erreur
 
@@ -75,11 +52,17 @@ mape <- function(y,ychap)
 ################
 
 ################## Cubic regression
-equation <- Load~s(Load.48,k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+s(Temp, k=5, bs="cr")+s(toy, k=35, bs="cr")+te(Load.48,Temp_s99)+WeekDays+DLS+Christmas_break+Summer_break+s(Temp_s99_min, k=5)+s(Temp_s99_max, k=5)+s(Temp_s95_min, k=5)+s(Temp_s95_max, k=5)
+equation <- Load~s(Load.48, k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+s(Temp, k=5, bs="cr")+s(toy, k=35, bs="cr")+te(Load.48,Temp_s99)+WeekDays+DLS+Christmas_break+Summer_break+s(Temp_s99_min, k=5)+s(Temp_s99_max, k=5)+s(Temp_s95_min, k=5)+s(Temp_s95_max, k=5)
 
 for(i in c(1:H))
 {
   assign(paste("gam_ouvre_cr", i, sep="_"), gam(equation, data=eval(parse(text=paste("d_ent_ouvre", i, sep="_")))))
+}
+
+# calcul des prédictions
+for(i in c(1:H))
+{
+  assign(paste("pred_gam_ouvre", i, sep="_"), predict(eval(parse(text=paste("gam_ouvre_cr", i, sep="_"))), newdata = eval(parse(text=paste("d_test_ouvre", i, sep="_")))))
 }
 
 save(list = ls(all = TRUE), file= "MODELES/GAM.rda")
