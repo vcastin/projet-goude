@@ -40,7 +40,7 @@ mape <- function(y,ychap)
   return(round(100*mean(abs(y-ychap)/abs(y)), digits=2))
 }
 
-######### sur un seul jeu de données pour commencer
+######### sur d_ent_ouvre_1
 
 # bootstrap et entraînement de différents GAM
 
@@ -67,7 +67,18 @@ Nbag <-10
 
 n <- nrow(d_ent_ouvre_1)
 
-gam.bagg <- bagging(Nbag, data_app=d_ent_ouvre_1, equation, size=floor(0.8*n))
+gam.bagg_1 <- bagging(Nbag, data_app=d_ent_ouvre_1, equation, size=floor(0.8*n))
 
-save(gam.bagg, file="MODELES/bagging_gam.rda")
 
+######### sur d_ent_ouvre_12
+
+#### 10 nouveaux GAM
+
+Nbag <-10
+
+n <- nrow(d_ent_ouvre_12)
+
+gam.bagg_12 <- bagging(Nbag, data_app=d_ent_ouvre_12, equation, size=floor(0.8*n))
+
+# sauvegarde
+save(gam.bagg_1, gam.bagg_12, file="MODELES/bagging_gam.rda")

@@ -64,7 +64,7 @@ mape(pred_gbm_0, d_test_ouvre_1$Load)
 
 ####### avec xgboost
 
-d_xgb_0 <- data.matrix(d_ent_ouvre_1[,-c(1,2,3,4,5,6,7,8,20)])
+d_xgb_0 <- data.matrix(d_ent_ouvre_1[,-c(1,2,3,4,5,6,7,8,20)])  # ici on prend bcp plus de covariables
 d_xgb_1 <- data.matrix(d_test_ouvre_1[,-c(1,2,3,4,5,6,7,8,20)])
 
 xgb_0 <- xgboost(params=list(subsample=0.9, eta = 0.05, max.depth = 10, colsample_bytree=1),
@@ -75,6 +75,74 @@ xgb_0 <- xgboost(params=list(subsample=0.9, eta = 0.05, max.depth = 10, colsampl
 pred_xgb <- predict(xgb_0, d_xgb_1)
 mape(d_test_ouvre_1$Load, pred_xgb)
 
+######## Sur tous les jeux de données
+
+H <- 24
+
+###### Avec gbm
+
+Ntree <- 1000
+
+equation <- as.formula("Load ~ Temp_s99+toy+Lundi+Mardi+Mercredi+Jeudi+Vendredi+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp+Temp_s95_min+Temp_s95_max+Temp_s99_min+Temp_s99_max")
+
+for(i in c(1:H))
+{
+  assign(paste("gbm", i, sep="_"), gbm(equation, distribution = "gaussian", data=eval(parse(text=paste("d_ent_ouvre", i, sep="_"))),
+                                       n.trees = Ntree, interaction.depth = 10, n.minobsinnode = 5, shrinkage = 0.05, bag.fraction = 0.5,
+                                       train.fraction = 1, keep.data = FALSE, n.cores = 4))
+}
 
 
+for(i in c(1:H))
+{
+  assign(paste("pred_gbm", i, sep="_"), predict(eval(parse(text=paste("gbm", i, sep="_"))), n.trees = Ntree, single.tree=FALSE, newdata = eval(parse(text=paste("d_test_ouvre", i, sep="_")))))
+}
 
+
+# affichage des MAPE
+mape_ouvre_RTE <- c()
+for(i in c(1:H))
+{
+  mape_ouvre_RTE <- c(mape_ouvre_RTE, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Forecast_RTE_intraday))
+} # RTE pour comparaison
+
+mape_ouvre <- c()
+for(i in c(1:H))
+{
+  mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_gbm", i, sep="_")))))
+}
+
+
+#### Avec xgboost
+
+for(i in c(1:H))
+{
+  assign(paste("d_xgb_ent", i, sep="_"), data.matrix(eval(parse(text=paste("d_ent_ouvre", i, sep="_")))[,-c(1,2,3,4,5,6,7,8,20)]))
+  assign(paste("d_xgb_test", i, sep="_"), data.matrix(eval(parse(text=paste("d_test_ouvre", i, sep="_")))[,-c(1,2,3,4,5,6,7,8,20)]))
+  assign(paste("xgb", i, sep ="_"), xgboost(params=list(subsample=0.9, eta = 0.05, max.depth = 10, colsample_bytree=1),
+                                            data = eval(parse(text=paste("d_xgb_ent", i, sep="_"))), label = eval(parse(text=paste("d_ent_ouvre", i, sep="_")))$Load,
+                                            nthread = 4, objective = "reg:squarederror", nround = 1000,
+                                            booster = "gbtree", verbose = 0))
+}
+
+
+for(i in c(1:H))
+{
+  assign(paste("pred_xgb", i, sep="_"), predict(eval(parse(text=paste("xgb", i, sep="_"))), eval(parse(text=paste("d_xgb_test", i, sep="_")))))
+}
+
+
+##### affichage des MAPE
+
+mape_ouvre_2 <- c()
+for(i in c(1:H))
+{
+  mape_ouvre_2 <- c(mape_ouvre_2, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_xgb", i, sep="_")))))
+}
+
+# mape_ouvre
+
+plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
+lines(mape_ouvre_RTE, col="red")
+lines(mape_ouvre_2, col="pink")
+legend(x="bottomright", legend=c("gbm","RTE", "xgb"), col=c("blue","red", "pink"), pch=c(15,15,15))
