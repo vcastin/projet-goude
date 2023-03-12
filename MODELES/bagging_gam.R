@@ -40,7 +40,7 @@ mape <- function(y,ychap)
   return(round(100*mean(abs(y-ychap)/abs(y)), digits=2))
 }
 
-######### sur d_ent_ouvre_1
+######### sur d_ent_ouvre_0
 
 # bootstrap et entraînement de différents GAM
 
@@ -65,14 +65,14 @@ bagging <- function(Nbag, data_app, equation, size=n)
 
 Nbag <-10
 
-n <- nrow(d_ent_ouvre_1)
+n <- nrow(d_ent_ouvre_0)
 
-gam.bagg_1 <- bagging(Nbag, data_app=d_ent_ouvre_1, equation, size=floor(0.8*n))
+gam.bagg_0 <- bagging(Nbag, data_app=d_ent_ouvre_0, equation, size=floor(0.8*n))
 
 #### calcul des prédictions
 for(i in c(1:Nbag))
 {
-  assign(paste("pred_gam_bagg1", i, sep="_"), predict(gam.bagg_1[i], newdata = d_test_ouvre_1))
+  assign(paste("pred_gam_bagg0", i, sep="_"), predict(gam.bagg_0[i], newdata = d_test_ouvre_0))
 }
 
 

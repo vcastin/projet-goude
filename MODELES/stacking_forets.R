@@ -34,7 +34,7 @@ set.seed(1)
 load("MODELES/GAM.rda")
 
 # nouvelles bases de données test avec les splines du gam
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("pred_ouvre", i, sep="_"), predict(eval(parse(text=paste("gam_ouvre_cr", i, sep="_"))), newdata = eval(parse(text=paste("d_test_ouvre", i, sep="_"))), type='terms'))
   eval(parse(text=paste("colnames(pred_ouvre_", i, ")<-", "paste0(\"gterms_\", c(1:ncol(eval(parse(text=paste(\"pred_ouvre\", i, sep=\"_\"))))))", sep="" )))
@@ -42,7 +42,7 @@ for(i in c(1:H))
 }
 
 # nouvelles bases de données d'entraînement avec les splines du gam
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("fit_ouvre", i, sep="_"), predict(eval(parse(text=paste("gam_ouvre_cr", i, sep="_"))), newdata = eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), type='terms'))
   eval(parse(text=paste("colnames(fit_ouvre_", i, ")<-", "paste0(\"gterms_\", c(1:ncol(eval(parse(text=paste(\"fit_ouvre\", i, sep=\"_\"))))))", sep="" )))
@@ -77,18 +77,18 @@ print(p)
 # mtry = 10 a l'air pas mal
 
 # calcul des modèles
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("stack_ouvre", i, sep="_"), ranger(formule_2, data=eval(parse(text=paste("d_ent_ouvre_bis", i, sep="_"))), importance = "permutation", num.trees = 150, mtry=10))
 }
 
 # calcul des prédictions
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("pred_stack_ouvre", i, sep="_"), predict(eval(parse(text=paste("stack_ouvre", i, sep="_"))), data = eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))))
 }
 
-
+rm(pred_ouvre_0)
 rm(pred_ouvre_1)
 rm(pred_ouvre_2)
 rm(pred_ouvre_3)
@@ -112,8 +112,8 @@ rm(pred_ouvre_20)
 rm(pred_ouvre_21)
 rm(pred_ouvre_22)
 rm(pred_ouvre_23)
-rm(pred_ouvre_24)
 
+rm(fit_ouvre_0)
 rm(fit_ouvre_1)
 rm(fit_ouvre_2)
 rm(fit_ouvre_3)
@@ -137,8 +137,8 @@ rm(fit_ouvre_20)
 rm(fit_ouvre_21)
 rm(fit_ouvre_22)
 rm(fit_ouvre_23)
-rm(fit_ouvre_24)
 
+rm(gam_ouvre_cr_0)
 rm(gam_ouvre_cr_1)
 rm(gam_ouvre_cr_2)
 rm(gam_ouvre_cr_3)
@@ -162,7 +162,7 @@ rm(gam_ouvre_cr_20)
 rm(gam_ouvre_cr_21)
 rm(gam_ouvre_cr_22)
 rm(gam_ouvre_cr_23)
-rm(gam_ouvre_cr_24)
+
 
 save(list = ls(all = TRUE), file= "MODELES/stacking_forets.rda")
 

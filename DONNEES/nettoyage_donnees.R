@@ -50,18 +50,19 @@ d_ent_ouvre <- filter(d_ent, WeekDays != "Saturday" & WeekDays != "Sunday")
 d_test_ouvre <- filter(d_test, WeekDays != "Saturday" & WeekDays != "Sunday")
 
 # construction d'un data frame par heure
-H <- 24
+H <- 23
 
-for(i in c(1:H))
+for(i in c(0:H))
 {
-  assign(paste("d_ent_ouvre", i, sep="_"),filter(d_ent_ouvre, tod==i)) # d_ent_ouvre_i
+  assign(paste("d_ent_ouvre", i, sep="_"),filter(d_ent_ouvre, tod==2*i)) # d_ent_ouvre_i
 }
 
-for(i in c(1:H))
+for(i in c(0:H))
 {
-  assign(paste("d_test_ouvre", i, sep="_"),filter(d_test_ouvre, tod==i))
+  assign(paste("d_test_ouvre", i, sep="_"),filter(d_test_ouvre, tod==2*i))
 }
 
 rm(d)
 
 save(list = ls(all = TRUE), file= "DONNEES/data.rda")
+

@@ -54,13 +54,13 @@ mape <- function(y,ychap)
 ################## Cubic regression
 equation <- Load~s(Load.48, k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+s(Temp, k=5, bs="cr")+s(toy, k=35, bs="cr")+te(Load.48,Temp_s99)+WeekDays+DLS+Christmas_break+Summer_break+s(Temp_s99_min, k=5)+s(Temp_s99_max, k=5)+s(Temp_s95_min, k=5)+s(Temp_s95_max, k=5)
 
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("gam_ouvre_cr", i, sep="_"), gam(equation, data=eval(parse(text=paste("d_ent_ouvre", i, sep="_")))))
 }
 
 # calcul des prédictions
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("pred_gam_ouvre", i, sep="_"), predict(eval(parse(text=paste("gam_ouvre_cr", i, sep="_"))), newdata = eval(parse(text=paste("d_test_ouvre", i, sep="_")))))
 }

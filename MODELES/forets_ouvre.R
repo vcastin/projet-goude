@@ -54,13 +54,13 @@ mape <- function(y,ychap)
 formule_1 <- "Load ~ Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp+Temp_s95_min+Temp_s95_max+Temp_s99_min+Temp_s99_max"
 
 # calcul des modèles
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("foret_ouvre", i, sep="_"), ranger(formule_1, data=eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), importance = "permutation", num.trees = 150, mtry=8))
 }
 
 # calcul des prédictions
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("pred_foret_ouvre", i, sep="_"), predict(eval(parse(text=paste("foret_ouvre", i, sep="_"))), data = eval(parse(text=paste("d_test_ouvre", i, sep="_")))))
 }

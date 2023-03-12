@@ -46,7 +46,7 @@ mape <- function(y,ychap)
 }
 
 # nouvelles bases de données test avec les splines du gam
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("pred_ouvre", i, sep="_"), predict(eval(parse(text=paste("gam_ouvre_cr", i, sep="_"))), newdata = eval(parse(text=paste("d_test_ouvre", i, sep="_"))), type='terms'))
   eval(parse(text=paste("colnames(pred_ouvre_", i, ")<-", "paste0(\"gterms_\", c(1:ncol(eval(parse(text=paste(\"pred_ouvre\", i, sep=\"_\"))))))", sep="" )))
@@ -54,7 +54,7 @@ for(i in c(1:H))
 }
 
 # nouvelles bases de données d'entraînement avec les splines du gam
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("fit_ouvre", i, sep="_"), predict(eval(parse(text=paste("gam_ouvre_cr", i, sep="_"))), newdata = eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), type='terms'))
   eval(parse(text=paste("colnames(fit_ouvre_", i, ")<-", "paste0(\"gterms_\", c(1:ncol(eval(parse(text=paste(\"fit_ouvre\", i, sep=\"_\"))))))", sep="" )))
@@ -67,7 +67,7 @@ formule_2 <- paste0("Load ~Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_brea
 
 # calcul des modèles
 
-H <- 24
+H <- 23
 
 ###### Avec gbm
 
@@ -75,7 +75,7 @@ Ntree <- 1000
 
 equation <- as.formula("Load ~ Temp_s99+toy+Lundi+Mardi+Mercredi+Jeudi+Vendredi+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp+Temp_s95_min+Temp_s95_max+Temp_s99_min+Temp_s99_max")
 
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("gbm_stack", i, sep="_"), gbm(equation, distribution = "gaussian", data=eval(parse(text=paste("d_ent_ouvre_bis", i, sep="_"))),
                                        n.trees = Ntree, interaction.depth = 10, n.minobsinnode = 5, shrinkage = 0.05, bag.fraction = 0.5,
@@ -83,7 +83,7 @@ for(i in c(1:H))
 }
 
 
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("pred_gbm_stack", i, sep="_"), predict(eval(parse(text=paste("gbm_stack", i, sep="_"))), n.trees = Ntree, single.tree=FALSE, newdata = eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))))
 }
@@ -91,13 +91,13 @@ for(i in c(1:H))
 
 # calcul des MAPE
 mape_ouvre_RTE <- c()
-for(i in c(1:H))
+for(i in c(0:H))
 {
   mape_ouvre_RTE <- c(mape_ouvre_RTE, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Forecast_RTE_intraday))
 } # RTE pour comparaison
 
 mape_ouvre <- c()
-for(i in c(1:H))
+for(i in c(0:H))
 {
   mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))$Load, eval(parse(text=paste("pred_gbm_stack", i, sep="_")))))
 }
@@ -105,7 +105,7 @@ for(i in c(1:H))
 
 #### Avec xgboost
 
-for(i in c(1:H))
+for(i in c(0:H))
 {
   print(i)
   assign(paste("d_xgb_stack_ent", i, sep="_"), data.matrix(eval(parse(text=paste("d_ent_ouvre_bis", i, sep="_")))[,-c(1,2,3,4,5,6,7,8,20)]))
@@ -117,7 +117,7 @@ for(i in c(1:H))
 }
 
 
-for(i in c(1:H))
+for(i in c(0:H))
 {
   assign(paste("pred_xgb_stack", i, sep="_"), predict(eval(parse(text=paste("xgb_stack", i, sep="_"))), eval(parse(text=paste("d_xgb_stack_test", i, sep="_")))))
 }
@@ -126,7 +126,7 @@ for(i in c(1:H))
 ##### affichage des MAPE
 
 mape_ouvre_2 <- c()
-for(i in c(1:H))
+for(i in c(0:H))
 {
   mape_ouvre_2 <- c(mape_ouvre_2, mape(eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))$Load, eval(parse(text=paste("pred_xgb_stack", i, sep="_")))))
 }
@@ -150,7 +150,7 @@ legend(x="bottomright", legend=c("gbm_stack","RTE", "xgb_stack"), col=c("blue","
 
 
 
-
+rm(pred_ouvre_0)
 rm(pred_ouvre_1)
 rm(pred_ouvre_2)
 rm(pred_ouvre_3)
@@ -174,8 +174,8 @@ rm(pred_ouvre_20)
 rm(pred_ouvre_21)
 rm(pred_ouvre_22)
 rm(pred_ouvre_23)
-rm(pred_ouvre_24)
 
+rm(fit_ouvre_0)
 rm(fit_ouvre_1)
 rm(fit_ouvre_2)
 rm(fit_ouvre_3)
@@ -199,8 +199,8 @@ rm(fit_ouvre_20)
 rm(fit_ouvre_21)
 rm(fit_ouvre_22)
 rm(fit_ouvre_23)
-rm(fit_ouvre_24)
 
+rm(gam_ouvre_cr_0)
 rm(gam_ouvre_cr_1)
 rm(gam_ouvre_cr_2)
 rm(gam_ouvre_cr_3)
@@ -224,7 +224,7 @@ rm(gam_ouvre_cr_20)
 rm(gam_ouvre_cr_21)
 rm(gam_ouvre_cr_22)
 rm(gam_ouvre_cr_23)
-rm(gam_ouvre_cr_24)
+
 
 save(list = ls(all = TRUE), file= "MODELES/stacking_boosting.rda")
 
