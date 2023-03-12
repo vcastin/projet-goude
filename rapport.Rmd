@@ -259,28 +259,34 @@ equation <- Load~s(Load.48,k=3, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k
 On vient de voir les forêts aléatoires qui nous ont données des résultats satisfaisant mais on peut espérer avoir de meilleurs résultats avec des modèles GAM bien paramétrés. Pour ce faire, on va dans un premier temps effectuer un GAM variable par variable pour comprendre leur influence sur la consommation et pour déterminer le degré de liberté optimal pour bien décrire les données sans pour autant faire un modèle trop complexe (même si compte-tenu du nombre de données à disposition, le risque d'overfitting est assez réduit). Avec les forêts et l'importance des variables, on a une guideline pour choisir lesquelles traiter en premier. Cette partie étant purement explicative, nous ne nous limitons pas à un modèle par heure pour simplifier l'interpretation qui, de toute manière, ne change pas si on observait les 24 résidus à chaque fois.
 
 
-```{r, echo=FALSE}
-g0 <- gam(Load~s(Load.48, k=3, bs="cr"), data=d_ent_ouvre)
-plot(d_ent_ouvre$Load, g0$residuals, main = "Résidus pour g0", xlab = "Consommation (MWh)", ylab = "Résidus" )
-fit0 <- getViz(g0, nsim = 50)
-plot(sm(fit0, 1), n = 400 ) +labs(title="Lien entre Load.48 et la consommation",x="Load.48 (MWh)",y="Consommation (MWh)")+ l_points() + l_fitLine() + l_ciLine()
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 
+library(gridExtra)
+
+g0 <- gam(Load~s(Load.48, k=3, bs="cr"), data=d_ent_ouvre)
+fit0 <- getViz(g0, nsim = 50)
+plot(d_ent_ouvre$Load, g0$residuals, main = "Résidus pour g0", xlab = "Consommation (MWh)", ylab = "Résidus" )
+
+
+plot(sm(fit0, 1), n = 400, main = "dépendance en Load.48", xlab = "Load.48 (MWh)", ylab = "Consommation (MWh)")+ l_points() + l_fitLine() + l_ciLine()
 ```
+
 
 On a la confirmation que Load.48 est une feature essentielle pour la prévision puisque ce simple modèle (où f est une fonction quasi affine donc on peut prendre k=3) explique déjà 89% de la variance. Pour autant, les résidus ne semblent clairement pas suivre une loi normale centrée ce qui laisse présager d'amélioration.
 
-```{r, echo=FALSE}
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 g2 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr"), data=d_ent_ouvre)
 fit2 <- getViz(g2, nsim = 50)
 plot(d_ent_ouvre$Load, g2$residuals, main="Résidus pour g2", xlab="Consommation (MWh)",ylab="Résidus", pch=16)
-plot(sm(fit2, 2), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title="Lien entre Temp_s95_max et la consommation",x="Temp_s95_max (MWh)",y="Consommation (MWh)")
-plot(sm(fit2, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title="Lien entre Temp_s99_max et la consommation",x="Temp_s95_max (MWh)",y="Consommation (MWh)")
+plot(sm(fit2, 2), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title="",x="Temp_s95_max (MWh)",y="Consommation (MWh)")
+plot(sm(fit2, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title="",x="Temp_s95_max (MWh)",y="Consommation (MWh)")
 #summary(g2)
 
 ```
+
 On obtient un R2 de près de 92% donc l'amélioration est notable, d'autant plus qu'on reste avec des degrés de fonctions assez simple (k=5). Dans le prochain GAM, on ajoute toutes les données discrète (heures (via "time of the day") et jours)
 
-```{r, echo=FALSE}
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 g3 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr"), data=d_ent_ouvre)
 plot(d_ent_ouvre$Load, g3$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
 fit3 <- getViz(g3, nsim = 50)
@@ -290,13 +296,14 @@ fit3 <- getViz(g3, nsim = 50)
 On obtient un R2 de plus de 97% et on remarque que même si on laisse un grand degré de liberté pour la dépendance en toy (k=48) cela n'améliore pas le modèle. Cela justifie le fait de faire un modèle par heure plutôt qu'un par demi-heure. 
 On traite à part le cas de toy puisque le degré de liberté est moins facilement paramétrable, on décide donc de trouver k par cross validation :
 
-```{r, echo=FALSE}
+```{r , echo=FALSE}
 load("A_AFFICHER/cross_validation")
 plot(K, rmseK, type='b', pch=20,main="",xlab="",ylab="")
 points(K[12],rmseK[12],col="red")
 title(main="Cross validation pour déterminer nombre de splines pour décrire la feature toy",xlab="dimension de la base de spline (k)",ylab="RMSE (obtenu par block")
 legend(x="topright",legend=c("k=14"),col=c("red"),pch=c(20))
 ```
+
 On choisit donc k=14 par technique du coude. On réutilisera une cross-validation pour définir la base de spline que l'on va utiliser au final. Mais avant ça on calcul le gam final avec les degrés de liberté obtenus dans cette partie
 
 
@@ -322,6 +329,7 @@ plot(d_ent_ouvre$Load, gtot$residuals, main = "Résidus pour g3", xlab = "Consom
 fittot <- getViz(gtot, nsim = 50)
 
 ```
+
 On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un trop grand nombre de paramètres. De plus, les résidus ressemblent désormais bien à du bruit et donc semblent ne plus réellement contenir d'information.
 
 On peut alors le tester sur l'année suivante pour voir si notre GAM possède de bonnes propriétés de généralisation.
@@ -334,6 +342,7 @@ lines(d_test_ouvre$Date,d_test_ouvre$Forecast_RTE_intraday, xlab = "Date", ylab 
 lines(d_test_ouvre$Date,predictgam, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="red")
 legend(x="bottomright", legend=c("Donnée Réel","RTE","GAM"), col=c("black","blue","red"), pch=c(15,15,15))
 ```
+
 On voit dans ce plot annuelle que notre prédiction semble globalement collé à la consommation réelle, pour autant cette échelle ne permet pas une analyse fine donc on va s'attarder plutôt sur un mois en particulier, ici le mois de Décembre.
 
 
@@ -650,6 +659,7 @@ title(main="Prévision quantile GAM + normale",xlab="Date",ylab="Consommation")
 legend("top", inset = 0., pch =19, legend = levels(zfac), col = mescouleurs)
 
 ```
+
 On remarque que les différents quantiles sont de simples translation de notre GAM ce qui est évident mais bon a rappelé dans le cas des quantiles GAM+normale
 
 ### 7.3 QGAM
@@ -670,8 +680,10 @@ for (qu in qu_targetbis) {
 }
 j<-1
 ```
+
 On entraîne alors nos QGAMs selon les mêmes features que notre GAM pour avoir une bonne base de comparaison. A noté que la compilation est logique compte-tenu du fait que le problème non-paramétrique soit évident plus complexe à résoudre qu'un "simple" GAM.
 Pour visualiser le résultat, on peut là encore faire le même type de plot que dans la partie 5.2 et on remarque que les tracés ont l'air plus complexes et plus adaptés à la réalité des données. En effet, la courbe des quantiles les plus élevés à des variations de plus faibles amplitude que pour les autres quantiles. Une interprétation de ce phénomène pourrait-être que, comme cela est particulièrement visible en de juin à août, en été les consommations particulièrement élevé se propagent bien dans le temps, par exemple en période de canicule avec l'utilisation de la climatisation plusieurs jours de suite (ce n'est qu'une tentative d'interprétation).
+
 ```{r, echo=FALSE}
 qu_targetbis<-c(0.05,0.45,0.50,0.55,0.9)
 zfac <- factor(qu_targetbis)
@@ -686,6 +698,7 @@ lines(data_test$Date, qgam_predicteurs[[19]], col=mescouleurs[5])
 title(main="Prévision quantile QGAM",xlab="Date",ylab="Consommation")
 legend("top", inset = 0., pch =19, legend = levels(zfac), col = mescouleurs)
 ```
+
 ### 7.4 Comparaison entre la méthode naïve et les QGAM
 Intuitivement, on se dit que QGAM doit donner de meilleurs résultats que GAM+normale mais reste à trouver un critère qui permette de les comparer. Dans un premier temps nous nous sommes dis que nous pouvions compter le nombre de données du dataset de test qui sont au dessus du quantile q mais cette approche ne mesure pas vraiment ce que l'on veut.
 Nous avons donc décidé d'utiliser ici uniquement un critère plus pertinent à savoir la Pinball Loss sur les données d'entraînement et d'afficher le ratio entre les deux méthodes : $$ratio(quantile) = \frac{pinball(qgam(quantile))}{pinball(gam_+normale(quantile))}$$
@@ -775,7 +788,8 @@ lines(data_test_12$Date,data_test_12$Load, col="red")
 title(main="Recherche de tendance",xlab="Date",ylab="Consommation")
 legend("top",legend=c("data test","data train"),col=c("black","red"), lty=1:1)
 ```
-On Voit effectivement que nous testons nos données sur une année avec assez peu de consommation extrêmement élevés et à l'inverse plus de consommation très faibles. Pour autant, il n'y a clairement pas de tendance qui semblait annoncer cela et par conséquent on reste sur notre hypothèse selon laquelle l'année n'est pas une feature exploitable. 
+
+On voit effectivement que nous testons nos données sur une année avec assez peu de consommation extrêmement élevés et à l'inverse plus de consommation très faibles. Pour autant, il n'y a clairement pas de tendance qui semblait annoncer cela et par conséquent on reste sur notre hypothèse selon laquelle l'année n'est pas une feature exploitable. 
 
 
 ## 8 Agrégation d'experts : va-t-on battre RTE ?
