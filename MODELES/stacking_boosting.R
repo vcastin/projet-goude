@@ -96,10 +96,10 @@ for(i in c(0:H))
   mape_ouvre_RTE <- c(mape_ouvre_RTE, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Forecast_RTE_intraday))
 } # RTE pour comparaison
 
-mape_ouvre <- c()
+mape_ouvre_sgbm <- c()
 for(i in c(0:H))
 {
-  mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))$Load, eval(parse(text=paste("pred_gbm_stack", i, sep="_")))))
+  mape_ouvre_sgbm <- c(mape_ouvre_sgbm, mape(eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))$Load, eval(parse(text=paste("pred_gbm_stack", i, sep="_")))))
 }
 
 
@@ -125,17 +125,17 @@ for(i in c(0:H))
 
 ##### affichage des MAPE
 
-mape_ouvre_2 <- c()
+mape_ouvre_sxgb <- c()
 for(i in c(0:H))
 {
-  mape_ouvre_2 <- c(mape_ouvre_2, mape(eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))$Load, eval(parse(text=paste("pred_xgb_stack", i, sep="_")))))
+  mape_ouvre_sxgb <- c(mape_ouvre_sxgb, mape(eval(parse(text=paste("d_test_ouvre_bis", i, sep="_")))$Load, eval(parse(text=paste("pred_xgb_stack", i, sep="_")))))
 }
 
 # mape_ouvre
 
-plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
+plot(mape_ouvre_sgbm, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
 lines(mape_ouvre_RTE, col="red")
-lines(mape_ouvre_2, col="pink")
+lines(mape_ouvre_sxgb, col="pink")
 legend(x="bottomright", legend=c("gbm_stack","RTE", "xgb_stack"), col=c("blue","red", "pink"), pch=c(15,15,15))
 
 
