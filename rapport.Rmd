@@ -49,6 +49,13 @@ library(opera)
 library(corrplot)
 library(vip)
 library(dygraphs)
+library(mltools)
+library(data.table)
+library(caret)
+library(forecast)
+library(RColorBrewer)
+
+
 
 set.seed(1)
 
@@ -671,6 +678,247 @@ plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019
 lines(mape_ouvre_RTE, col="red")
 legend(x="bottomright", legend=c("GAM+forets","RTE"), col=c("blue","red"), pch=c(15,15))
 ```
+
+
+## 6 QGAM & prévision en loi
+
+### 6.1 Motivations
+
+Dans les précédantes partie du rapport, nous nous contentions de fournir "la meilleur prévision possible" mais on peut également être amené à vouloir prédire plus que ça. En effet, des problèmes pratique peuvent impliquer de vouloir obtenir une prévision d'un intervalle de confiance que ce soit pour des raisons de gestion de risque ou bien pour des problématiques d'analyse d'événements rares. Voici donc une liste non-exhaustive des raisons d'effectuer des prévisions en loi ce que nous allons faire tout au long de cette partie.
+
+### 6.2 Présentation & une première approche naîve
+
+Comme expliqué dans le paragraphe précédant, ce que l'on cherche à obtenir c'est une prévision des quantiles de la loi qui nous intéresse. Or si l'on se rappelle du fonctionnement des GAMS (cf partie 4), notre model est designé pour produire quelque chose de la forme $$ y_i=X_i\beta + f_1(x_{1,i})+ f_2(x_{2,i},x_{3,i})+...+ f_d(x_{d,i})+\epsilon_i $$ où $$\epsilon_i \sim \mathcal{N}(0,\,\sigma^{2})$$
+Par conséquent, un model que l'on a naturellement envie de prendre pour prédire la loi qui nous intéresse serait de prendre les quantiles d'une variable d'Espérance la prédiction produite par le GAM et de Variance $\sigma^2$ que l'on obtiendrait en prenant par exemple l'estimateur empirique de la variance sur les données d'entraînement.
+
+
+```{r, echo=FALSE , include=FALSE}
+#load("/Users/guillaumeprincipato/Desktop/Orsay/Cours/Semestre\ 1/Projet\ ML\ Goude/ProjetDataMining/datapropre")
+#load("/Users/guillaumeprincipato/Desktop/Orsay/Cours/Semestre\ 1/Projet\ ML\ Goude/ProjetDataMining/qgam_0.05...0.95")
+load("MODELES/qgam_midi")
+load("DONNEES/data.rda")
+
+```
+
+Dans cette partie, nous nous sommes limités à une seule heure pour des raisons de calcul qui ont vite tendance à être très élevé avec l'approche que l'on verre en 6.3
+
+Le Gam que l'on regarde est fait à partir de l'equation suivante : 
+Lequation <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)+s(Temp_s95_min)+s(Temp_s95_max)+s(Temp_s99_min)+s(Temp_s99_max)+Lundi+Mardi+Mercredi+Jeudi+Vendredi
+
+et on peut vérifier que l'hypothèse de normalité des résidus est loin d'être délirante lorsqu'on regarde l'histogramme des résidus qui semble correspondre quasi parfaitement :
+
+```{r, echo=FALSE}
+data_train<-d_ent_ouvre_24
+data_test<-d_test_ouvre_24
+
+#On fait les prévisions avec qgam
+
+qgam.preds <- sapply(Viz, predict, newdata = data_test)
+qgam.pl <- pinLoss(data_test$Load, qgam.preds, qu=qu_target)
+
+
+ #On fait les prévisions avec gam
+equation <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)+s(Temp_s95_min)+s(Temp_s95_max)+s(Temp_s99_min)+s(Temp_s99_max)+Lundi+Mardi+Mercredi+Jeudi+Vendredi
+
+gam_quantile<- gam(equation, data=data_train)
+forecast<-predict(gam_quantile, newdata=data_test)
+standart_dev<-sd(gam_quantile$residuals)
+
+qgam_predicteurs<-list()
+gam_normale_predicteurs<-list()
+j<-1
+for (qu in qu_target) {
+
+  qgam_predicteurs[[j]]<-qgam.preds[, as.character(qu)]
+  gam_normale_predicteurs[[j]]<-qnorm(c(qu),mean=forecast,sd=standart_dev)
+  j<-1+j
+}
+
+j<-1
+
+
+ratio_quantiles<-list()
+
+for (qu in qu_target){
+  qgam<-qgam_predicteurs[[j]] #90%
+  gam_normale<-gam_normale_predicteurs[[j]]
+
+
+  
+  pinLossqgam <- pinLoss(data_test$Load, qgam, qu=qu,add = FALSE)
+  pinLossgam_normale <- pinLoss(data_test$Load, gam_normale, qu=qu,add = FALSE)
+  #pinLossqgam<-pinLossqgam[,3]
+
+  #print(pinLossqgam/pinLossgam_normale)
+  PinballLoss_qgam<-mean(pinLossqgam)
+  PinballLoss_gam_normale<-mean(pinLossgam_normale)
+  #print(PinballLoss_qgam)
+  ratio<-PinballLoss_qgam/ PinballLoss_gam_normale
+  ratio_quantiles[[j]]<-ratio
+  j<-j+1
+}
+
+```
+
+```{r, echo=FALSE}
+#gam.check(gam_quantile)
+type <- "deviance"  ## "pearson" & "response" are other valid choices
+resid <- residuals(gam_quantile, type = type)
+linpred <- napredict(gam_quantile$na.action, gam_quantile$linear.predictors)
+observed.y <- napredict(gam_quantile$na.action, gam_quantile$y)
+
+hist(resid, xlab = "Residuals", main = "Histogram of residuals")
+
+
+
+```
+
+Pour autant, si on s'attarde sur le diagramme quantile/quantile, on remarque que pour les valeurs extrêmes cela est moins vrai.
+
+```{r,echo=FALSE}
+split.screen(1:2)
+screen(1)
+qq.gam(gam_quantile, rep = 0, level = 0.9, type = type, rl.col = 2, 
+       rep.col = "gray80")
+screen(2)
+
+plot(linpred, resid, main = "Resids vs. linear pred.", 
+     xlab = "linear predictor", ylab = "residuals")
+```
+
+
+De plus, on doit remarquer que la variance des résidus ne semble pas être constante ce qui peut laisser imaginer des améliorations potentielles pour une méthode qui prend cette caractéristique en compte. On peut, pour conclure cette partie, afficher ce que donne cette méthode pour les quantiles allant de 5 % à 95 %.
+
+```{r,echo=FALSE}
+qu_targetbis<-c(0.05,0.45,0.50,0.55,0.9)
+zfac <- factor(qu_targetbis)
+mescouleurs <- rainbow(length(levels(zfac)))
+plot(data_test$Date, data_test$Load, type='l',main = "", xlab="", ylab="", lwd=2)
+
+lines(data_test$Date, gam_normale_predicteurs[[1]], col=mescouleurs[1]) 
+lines(data_test$Date, gam_normale_predicteurs[[9]], col=mescouleurs[2]) 
+lines(data_test$Date, gam_normale_predicteurs[[10]], col=mescouleurs[3]) 
+lines(data_test$Date, gam_normale_predicteurs[[11]], col=mescouleurs[4]) 
+lines(data_test$Date, gam_normale_predicteurs[[19]], col=mescouleurs[5]) 
+title(main="Prévision quantile GAM + normale",xlab="Date",ylab="Consommation")
+legend("top", inset = 0., pch =19, legend = levels(zfac), col = mescouleurs)
+
+```
+
+### 6.3 QGAM
+
+Comme évoqué précédemment, le model décrit dans la partie précédante n'est qu'une approche naïve car dans notre cas, c'est clair que la variance ne va pas être la même selon si la consommation est importante ou pas. Par conséquent, nous avons choisi d'utiliser des QGAMs qui est une méthode qui s’affranchit du cadre paramétrique dans lequel les GAMs étaient contraints en utilisant des méthodes de calibrations Bayesiennes (@Manual). Pour ce faire, le model est entraîné à partir d'une fonction de perte classique : 
+
+```{r, echo=FALSE}
+n <- 1000
+x <- seq(0, 4, length.out = n)
+plot(x, pinLoss(x, rep(2, n), qu = 0.5, add = FALSE),main="Pinball Loss", type = 'l', ylab = "loss")
+j<-1
+
+mescouleurs <- rainbow(length(levels(zfac)))
+
+for (qu in qu_targetbis) {
+  lines(x, pinLoss(x, rep(2, n), qu = qu, add = FALSE), col=mescouleurs[j]) 
+  j<-j+1
+}
+j<-1
+```
+
+On peut là encore faire le même type de plot que dans la partie 5.2 et on remarque que les tracés ont l'air plus complexes et plus adaptés à la réalité des données.
+
+```{r, echo=FALSE}
+qu_targetbis<-c(0.05,0.45,0.50,0.55,0.9)
+zfac <- factor(qu_targetbis)
+mescouleurs <- rainbow(length(levels(zfac)))
+plot(data_test$Date, data_test$Load, type='l',main = "", xlab="", ylab="", lwd=3)
+
+lines(data_test$Date, qgam_predicteurs[[1]], col=mescouleurs[1]) 
+lines(data_test$Date, qgam_predicteurs[[9]], col=mescouleurs[2]) 
+lines(data_test$Date, qgam_predicteurs[[10]], col=mescouleurs[3]) 
+lines(data_test$Date, qgam_predicteurs[[11]], col=mescouleurs[4]) 
+lines(data_test$Date, qgam_predicteurs[[19]], col=mescouleurs[5]) 
+title(main="Prévision quantile QGAM",xlab="Date",ylab="Consommation")
+legend("top", inset = 0., pch =19, legend = levels(zfac), col = mescouleurs)
+```
+
+Intuitivement, on se dit que QGAM donne de meilleur résultat que GAM+normale mais reste à trouver un critère qui permet de les comparer. Dans un premier temps nous nous sommes dis que compter le nombre de données du dataset de test qui sont au dessus du quantile q mais cette approche ne mesure pas vraiment ce que l'on veut.
+Nous avons donc décidé d'utiliser ici uniquement un critère plus pertinent à savoir la pinball loss sur les données d'entraînement et d'afficher le ratio entre les deux méthodes : $$ratio(quantile) = \frac{pinball(qgam(quantile))}{pinball(gam_+normale(quantile))}$$
+
+```{r, echo=FALSE}
+#Ratio à midi
+plot(qu_target,ratio_quantiles,main = "Ratio", xlab="quantile", ylab="ratio",type="l")
+y<-rep(1,length(qu_target))
+lines(qu_target,y, type="l",col="blue", lty=2)
+```
+
+Comme prévu, QGAM donne de meilleur résultat pour environ tous les quantiles. A noter toutefois que pour les quantiles entre 25% et 40% les quantiles de la loi normale donnent des résultats légèrement meilleur (de l'ordre d'1 à 2%) mais cela n'est pas comparable aux écarts allant jusqu'à plus de 10% pour le reste des quantiles (plus les quantiles sont extrêmes plus la différence de performance est grande). Par conséquent, on peut conclure que lorsqu'on s'intéresse aux quantiles extrêmes, QGAM est nécessaire car c'est justement pour ces données extrêmes que l'hypothèse de variance constante n'est plus viable. En revanche, GAM+normale peut être utilisé notamment dans des modèles d’agrégation d'expert puisqu'il est assez performant pour des quantiles proches de la médiane.
+
+
+### 6.4 Applications (Focus on 90%)
+
+Dans cette dernière sous-partie, nous allons regarder un cas d'application pour un quantile extrême à savoir 90 %. Dans le cas de l'électricité, on peut facilement imaginer des applications pour calibrer le parc électrique de sortes à ce qu'il puisse produire à moindre coût pour des consommations "habituelles". Dans un premier temps, on affiche les quantiles sur les données de test.
+
+```{r, echo=FALSE , include=FALSE}
+#mauvais qgam
+
+equation1 <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)
+qgam_l1<- mqgam(form = list(equation1,~ s(Temp)), data = data_train, qu = c(0.5,0.9))
+Viz1 <- getViz(qgam_l1)
+qgam.preds1 <- sapply(Viz1, predict, newdata = data_test)
+```
+
+
+```{r,echo=FALSE}
+plot(data_test$Date, data_test$Load, type='l',main = "", xlab="", ylab="",col="black")
+lines(data_test$Date, qgam_predicteurs[[18]], col="cyan") 
+lines(data_test$Date, gam_normale_predicteurs[[18]], col="blue") 
+lines(data_test$Date, qgam.preds1[,"0.9"], col="purple") 
+legend("top",legend=c("data test","gam + normale 90%","qgam 90%","mauvais qgam (underfitting)"),col=c("black","cyan", "blue","purple"), lty=1:1:1:1)
+
+```
+
+Ce graphique illustre plusieurs choses d'intéressantes, à commencer par le fait qu'un mauvais qgam (qui ne prends pas en compte le jour de la semaine) n'épouse pas la forme de la courbe notamment dans les cas où la consommation est faible (probablement correspondant au week-end) mais que sinon il coïncide pas trop mal avec les deux autres. Sinon, le QGAM et le GAM+normale sont globalement similaire à l’œil nu (mais on a vu dans la partie 5.3 que QGAM avait une Pinball Loss plus faible d'environ 6%) mais il semblerait que le QGAM soit globalement plus proche de la courbe, ce qui, si on extrapole l'analyse faite du mauvais QGAM, doit être plutôt une bonne chose dans le cas présent. Bien que l'on ait dit que cela n'était pas vraiment pertinent, regardons la proportion des points du dataset de test qui sont au dessus de chacune des courbes : 
+
+```{r, echo=FALSE}
+verifquantile<-function(y,ychap)
+{
+  i<-1
+  compteur<-0
+  for (Load in y) {
+    #print(Load)
+    if (Load<=ychap[[i]]) {
+      compteur<-compteur+1
+    }
+    
+    i<-i+1
+  }
+  #print(i)
+  #print(compteur)
+  return (100*compteur/i)
+  
+}
+D<-qgam_predicteursbis[[18]]
+verif1<-verifquantile(data_test$Load,qgam_predicteurs[[18]])
+verif2<-verifquantile(data_test$Load,gam_normale_predicteurs[[18]])
+verif3<-verifquantile(data_test$Load,qgam.preds1[,"0.9"])
+
+proportion_au_dessus<-c(verif1,verif2,verif3)
+verif_name<-c("QGAM","GAM+normale","mauvais QGAM")
+dataframe<-as.data.frame(cbind(verif_name,proportion_au_dessus))
+
+dataframe
+```
+
+Cela va dans le sens des observations faites précédemment et donc fait office de bon complément.
+
+##Référence
+
+@Manual{R-base,
+  title = {qgam: Bayesian Nonparametric Quantile Regression Modeling in R},
+  author = {{Matteo Fasiolo, Simon N. Wood, Margaux Zaffran, Raphaël Nedellec, Yannig Goude}},
+  year = {2021},
+  url = {https://www.jstatsoft.org/article/view/v100i09},
+}
 
 
 
