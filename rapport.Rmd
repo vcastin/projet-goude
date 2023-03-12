@@ -243,15 +243,15 @@ On observe que la consommation de la veille et les différentes transformations 
 
 ## 4 Modèles additifs généralisés (GAM)
 
-  Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. En effet, pour obtenir un fit aussi proche des données que l'on veut il suffit que la consommation s'écrive plus ou moins sous la forme : 
-$$ y_i=X_i\beta + f_1(x_{1,i})+ f_2(x_{2,i},x_{3,i})+...+ f_d(x_{d,i})+\epsilon_i \  \text{ avec } \ \epsilon_i \sim \mathcal{N}(0,\,\sigma^{2})$$ 
-  Dans notre cas, nous avons la chance d'avoir beaucoup de données et par conséquent le risque d'overfit est assez modéré donc on peut se permettre une telle décomposition qui implique forcément d'avoir un grand nombre de paramètres. Pour autant, dans cette partie nous allons construire un GAM avec pour objectif d'avoir des **f_i** pas trop compliquées. Pour ce faire nous allons dans un premier temps analyser les dépendance en chacune des features. Puis nous améliorerons les performances en faisant un modèle par heure. Nous utilisons des splines de régression cubique pour des raisons que l'on expliquera plus tard.
+  Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. En effet, pour obtenir une bonne modélisation des données par un GAM, il suffit que la consommation soit bien approchée par une somme de fonctions lisses (appelées splines) des paramètres : 
+$$ y_i=X_i\beta + f_1(x_{1,i})+ f_2(x_{2,i},x_{3,i})+...+ f_d(x_{d,i})+\epsilon_i \  \text{ avec } \ \epsilon_i \sim \mathcal{N}(0,\,\sigma^{2}).$$ 
+  Dans notre cas, nous avons la chance d'avoir beaucoup de données, et par conséquent le risque d'overfit est assez modéré. Nous pouvons donc nous permettre d'inclure un grand nombre de splines différentes dans le modèle, une pour chaque paramètre, plus un ou plusieurs effets croisés (spline dépendant de deux variables). Pour autant, nous allons dans cette partie construire un GAM avec pour objectif d'avoir des $f_i$ relativement simples. Pour ce faire, nous analysons dans un premier temps les dépendances de la consommation en chacune des covariables. Nous exploitons ensuite les valeurs de paramètres obtenues, en entraînant un modèle par heure, avec des splines de régression cubique, ce qui sera justifié plus avant.
 
-### Modèles variable par variable, pour optimiser la valeur de k
+### 4.1 Modèles variable par variable, pour optimiser le nombre de degrés de liberté
 
-  On vient de voir les forêts aléatoires qui nous ont données des résultats satisfaisant mais on peut espérer avoir de meilleurs résultats avec des modèles GAM bien paramétrés. Pour ce faire, on va dans un premier temps effectuer un GAM variable par variable pour comprendre leur influence sur la consommation et pour déterminer le degré de liberté optimal pour bien décrire les données sans pour autant faire un modèle trop complexe. L'étude des forêts nous a fourni l'importance des variables ce qui donne une guideline pour choisir lesquelles traiter en premier. Cette partie étant purement explicative, nous ne nous limitons pas à un modèle par heure pour simplifier l’interprétation qui, de toute manière, ne change pas si on observait les 24 résidus à chaque fois.
+  On vient de voir les forêts aléatoires, qui nous ont donné des résultats satisfaisants. Nous allons cependant améliorer notre performance avec des modèles GAM bien paramétrés. Pour ce faire, calculons tout d'abord un GAM variable par variable, pour comprendre l'influence de chacune sur la consommation et pour déterminer le degré de liberté optimal associé : il s'agit de bien décrire les données, sans pour autant faire un modèle trop complexe. L'étude des forêts nous a fourni l'importance des variables, que nous utilisons comme référence pour choisir lesquelles traiter en premier. Cette partie étant purement explicative, nous ne séprons par les différentes heures de la journée, pour simplifier l’interprétation. Le résultat obtenu est sensiblement le même.
   
-  On commence par la variable qui contient le plus d'information à savoir **Load.48** et on tatonne pour obtenir une bonne valeur de k. Ici ce choix n'était pas très dur à faire car comme on le voit bien sur la figure de droite, la dépendance de **Load** en **Load.48** est quasi linéaire. On choisit donc k le plus petit possible à savoir **k=3**.
+  On commence par la variable qui contient le plus d'information, à savoir **Load.48**, et on tatonne pour obtenir une bonne valeur de **k**. Ici ce choix n'était pas très dur à faire, car comme on le voit bien sur la figure de droite, la dépendance de **Load** en **Load.48** est quasi linéaire. On choisit donc **k** le plus petit possible, à savoir **k=3**.
 
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
@@ -265,7 +265,7 @@ plot(sm(fit0, 1), n = 400, main = "dépendance en Load.48", xlab = "Load.48 (MWh
 ```
 
 
-  On a alors la confirmation que Load.48 est une feature essentielle pour la prévision puisque ce simple modèle explique déjà 89% de la variance. Pour autant, les résidus ne semblent clairement pas suivre une loi normale centrée ce qui laisse présager d'amélioration. Pour trouver ces améliorations, on continue de remonter l'ordre d'importance des features. On effectue un nouveau GAM qui est le précedant auquel on a rajouter une dépendance en les températures lissées maximales **Temp_s95_max** et **Temp_s99_max**. Une fois encore, on remarque que les dépendances semblent être des fonctions polynomiales de faibles degrés. On choisit alors une assez faible valeur pour **k** à savoir **k=5** pour les deux.
+  On a alors la confirmation que Load.48 est une feature essentielle pour la prévision, puisque ce simple modèle explique déjà 89% de la variance. Pour autant, les résidus ne suivent manifestement pas une loi normale centrée, ce qui laisse présager d'améliorations possibles. Pour trouver ces améliorations, on poursuit dans la liste des covariables, par ordre d'importance. On effectue un nouveau GAM, formé du précedent auquel on a ajouté une dépendance en les températures lissées maximales **Temp_s95_max** et **Temp_s99_max**. Une fois encore, on remarque que les dépendances semblent être des fonctions polynomiales de faibles degrés. On choisit alors une assez faible valeur pour **k**, à savoir **k=5** pour les deux.
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 g2 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr"), data=d_ent_ouvre)
@@ -277,7 +277,7 @@ plot(sm(fit2, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title=""
 
 ```
 
-On obtient une explication de la variance de près de 92% donc l'amélioration est encore notable. Dans le prochain GAM, on ajoute toutes les données discrète à savoir l'heure via **tod** et le jour via **WeekDays**. Et compte-tenu du fait qu'à terme on veut faire un model par heure, on choisit **k=24** pour **tod**
+On obtient une explication de la variance de près de 92%, donc l'amélioration est encore notable. Dans le GAM suivant, on ajoute toutes les données discrètes, à savoir l'heure via **tod** et le jour via **WeekDays**. Et compte tenu du fait qu'à terme on veut faire un modèle par heure, on choisit **k=24** pour **tod**
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 g3 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr"), data=d_ent_ouvre)
@@ -286,22 +286,22 @@ fit3 <- getViz(g3, nsim = 50)
 ```
 
 
-Pour ce troisième GAM, on obtient un R2 de plus de 97% et on remarque que même si on laisse un grand degré de liberté pour la dépendance en **toy** (par exemple **k=48**) cela n'améliore pas le R2. Cela justifie le fait de faire un modèle par heure plutôt qu'un par demi-heure. On peut également noter que les Résidus commencent de plus en plus à ressembler à du bruit ce qui est un bon indicateur.
+Pour ce troisième GAM, on obtient un $R2$ de plus de 97%, et l'on remarque que même en attribuant un plus grand degré de liberté à la variable **toy** (par exemple **k=48**) cela n'améliore pas le $R2$. On peut également noter que les résidus commencent de plus en plus à ressembler à du bruit, ce qui est un bon indicateur de la performance du modèle.
 
-Pour le prochain ajout de feature (**toy** *time of the year*), on décide de ne plus choisir k en tâtonnant car la dépendance est moins facile à voir. On décide donc de trouver la valeur **k** par cross validation. Pour ce faire, on sépare les données en 10 blocks où 9 servent à l'entraînement et le dernier sert à obtenir une valeur du **RMSE**.
+Pour le prochain ajout de feature (**toy** *time of the year*), on décide de ne plus choisir *k* en tâtonnant car la dépendance est moins facile à voir. On détermine donc la valeur **k** par validation croisée. Pour ce faire, on sépare les données en 10 blocs, où 9 servent à l'entraînement et le dernier sert à obtenir une estimation du **RMSE**.
 
 ```{r , echo=FALSE}
 load("A_AFFICHER/cross_validation")
 plot(K, rmseK, type='b', pch=20,main="",xlab="",ylab="")
 points(K[12],rmseK[12],col="red")
-title(main="Cross validation pour trouver le k de toy",xlab="dimension de la base de spline (k)",ylab="RMSE (obtenu par block)")
+title(main="Validation croisée pour trouver le k de toy",xlab="k (dimension de la base de spline)",ylab="RMSE (obtenu par bloc)")
 legend(x="topright",legend=c("k=14"),col=c("red"),pch=c(20))
 ```
 
-On choisit donc k=14 par technique du coude. On réutilisera une cross-validation pour définir la base de spline que l'on va utiliser au final. Mais avant cela, on calcule le GAM final avec les degrés de liberté obtenus dans cette partie (et d'autres obtenus à part pour ne pas que cela soit trop redondant dans le rapport) ce qui donne alors l'equation suivante :
+On choisit donc **k=14** par technique du coude. On refera une validation croisée pour définir la base de spline que à utiliser. Nous obtenons, avec les degrés de liberté obtenus dans cette partie (et d'autres obtenus de façon analogue, que nous ne détaillons pas pour éviter d'alourdir le rapport), l'équation suivante :
 
 ```{r}
-equation<-Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+s(Temp_s95_min, k=5, bs="cr")+s(Temp_s99_min, k=5, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr")+s(toy,k=14)+Christmas_break+Summer_break
+equation <- Load ~ s(Load.48, k=3, bs="cr") + s(Temp_s95_max, k=5, bs="cr") + s(Temp_s99_max, k=5, bs="cr") + s(Temp_s95_min, k=5, bs="cr") + s(Temp_s99_min, k=5, bs="cr") + s(Temp_s95, k=5, bs="cr") + s(Temp_s99, k=5, bs="cr") + WeekDays + s(tod, k=24, bs="cr") + s(toy,k=14) + Christmas_break + Summer_break
 ```
 
 
