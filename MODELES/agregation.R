@@ -61,9 +61,9 @@ pred_qgam_0 <- sapply(Viz_0, predict, newdata = d_test_ouvre_0)
 
 experts <- cbind(pred_gam_ouvre_0, pred_foret_ouvre_0$predictions, pred_gbm_0,
                  pred_xgb_0, pred_stack_ouvre_0$predictions, pred_gbm_stack_0,
-                 pred_xgb_stack_0, pred_qgam_0[, "0.45"], pred_qgam_0[, "0.5"], pred_qgam_0[, "0.55"], pred_gam_bagg0)
+                 pred_xgb_stack_0, pred_qgam_0[, "0.4"], pred_qgam_0[, "0.45"], pred_qgam_0[, "0.5"], pred_qgam_0[, "0.55"], pred_gam_bagg0)
 
-colnames(experts) <- c("gam", "foret", "gbm", "xgb", "stack_foret", "stack_gbm", "stack_xgb", "qgam0.45", "qgam0.5", "qgam0.55", "gam_bagg0_1", "gam_bagg0_2", "gam_bagg0_3", "gam_bagg0_4", "gam_bagg0_5", "gam_bagg0_6", "gam_bagg0_7", "gam_bagg0_8", "gam_bagg0_9", "gam_bagg0_10")
+colnames(experts) <- c("gam", "foret", "gbm", "xgb", "stack_foret", "stack_gbm", "stack_xgb", "qgam0.4", "qgam0.45", "qgam0.5", "qgam0.55", "gam_bagg0_1", "gam_bagg0_2", "gam_bagg0_3", "gam_bagg0_4", "gam_bagg0_5", "gam_bagg0_6", "gam_bagg0_7", "gam_bagg0_8", "gam_bagg0_9", "gam_bagg0_10")
 
 
 oracle(Y=d_test_ouvre_0$Load, experts, model = "convex", loss.type = "square")
