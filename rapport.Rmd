@@ -16,10 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-A faire :
-- remettre en forme les figures
-
-Prédire la consommation d'électricité en France est un problème central, notamment pour la gestion du parc de production d'électricité français, dont le nucléaire, énergie peu modulable, représente une part importante. Dans ce projet, nous abordons cette question, qui rentre dans le cadre de la prévision de séries temporelles, en faisant appel à un large éventail de méthodes utilisant le machine learning. La performance de nos modèles se rapproche de celle de la prévision officielle de consommation fournie par RTE.
+Prédire la consommation d'électricité en France est un problème central, notamment pour la gestion du parc de production d'électricité français, dont le nucléaire, énergie peu modulable, représente une part importante. Dans ce projet, nous abordons cette question, qui rentre dans le cadre de la prévision de séries temporelles, en faisant appel à un large éventail de méthodes utilisant le machine learning.
 
 
 ## 1 Importation et prétraitement des données
@@ -80,7 +77,7 @@ Les variables que nous avons exploitées sont les suivantes.
   - Variables temporelles
     + **tod** : time of day, valeur numérique entre 0 et 1 indiquant le moment de la journée
     + **toy** : time of year, valeur numérique entre 0 et 1 indiquant le moment de l'année
-    + **Month** : chaîne de caractères indiquant le mois
+    + **Month** : entier indiquant le mois
     + **WeekDays** : chaîne de caractères indiquant le jour de la semaine
     + **BH** : 1 si l'on est un jour férié, 0 sinon
     + **DLS** : 1 si l'on est en heure d'hiver, 0 sinon
@@ -122,7 +119,7 @@ On s'attend aussi à avoir une périodicité annuelle. Pour la voir, nous repré
 knitr::include_graphics('FIGURES/mardi_12h.png')
 ```
 
-On voit que la consommation est nettement plus importante l'hiver, et on retrouve les vacances d'été et les vacances de Noël en creux.
+On voit que la consommation est nettement plus importante l'hiver, et l'on retrouve les vacances d'été et les vacances de Noël en creux.
 
 Ces observations nous incitent à traiter différemment chaque heure de la journée, et à distinguer les jours ouvrés des jours fériés, ce que nous faisons dans la sous-partie suivante. Quelles sont ensuite les variables explicatives les plus pertinentes pour prédire la consommation ? Nous ferons une étude plus approfondie dans la partie sur les forêts aléatoires, en nous fondant sur l'importance des variables, mais nous pouvons dans un premier temps afficher la corrélation entre les variables.
 
@@ -134,25 +131,28 @@ La température (telle quelle ou lissée) apparaît comme étant très anticorr�
 
 ### 1.3 Découpage du jeu de données
 
-En vue d'appliquer des modèles d'apprentissage, il nous faut séparer les données qui ont été obtenues dans des conditions trop différentes, pour que l'hypothèse de données identiquement distribuées soit raisonnablement satisfaite. Tout d'abord, les données de la période covid (notamment celles de l'année 2020) ne peuvent vraisemblablement pas être traitées comme celles des années précédentes. Nous choisissons donc comme ensemble d'entraînement la période de 2012 à 2018 inclus, et l'année 2019 sert d'ensemble de validation. Nous enlevons ensuite les jours fériés, qui correspondent à un changement ponctuel de la consommation, et nous séparons les jours ouvrés des week-ends, en vertu des observations réalisées dans la sous-partie précédente. Nous allons nous concentrer dans la suite sur le cas des jours ouvrés, la prédiction pour les week-ends étant très similaire et risquant d'alourdir le rapport inutilement.
+En vue d'appliquer des modèles d'apprentissage, il nous faut séparer les données qui ont été obtenues dans des conditions trop différentes, pour que l'hypothèse de données identiquement distribuées soit raisonnablement satisfaite. Tout d'abord, les données de la période covid (notamment celles de l'année 2020) ne peuvent vraisemblablement pas être traitées comme celles des années précédentes. Nous choisissons donc :
+
+- la période de 2012 à 2018 inclus comme ensemble d'entraînement
+- l'année 2019 comme ensemble de validation.
+
+Nous enlevons ensuite les jours fériés, qui correspondent à un changement ponctuel de la consommation, et nous séparons les jours ouvrés des week-ends, en vertu des observations réalisées dans la sous-partie précédente. Nous allons nous concentrer dans la suite sur le cas des jours ouvrés, la prédiction pour les week-ends étant très similaire et risquant d'alourdir le rapport inutilement.
 
 Pour avoir des modèles aussi précis que possible, mais aussi alléger le coût d'entraînement, puisque notre jeu de données est assez volumineux, nous avons entraîné un modèle différent par demi-heure. Nous avons sélectionné 24 demi-heures sur 48 (les premières demi-heures de chaque heure), pour faciliter l'affichage des résultats : cela ne change rien aux méthodes étudiées. Nous obtenons ainsi les jeux de données :
 
-- **d_ent_ouvre_i** pour $1\le i\le 24$, où l'on n'a gardé que les jours ouvrés dans **d_ent**, à l'heure $i$,
-- **d_test_ouvre_i** pour $1\le i\le 24$, où l'on n'a gardé que les jours ouvrés dans **d_test**, à l'heure $i$.
+- **d_ent_ouvre_i** pour $i=0,\dots,23$, où l'on n'a gardé que les jours ouvrés dans l'ensemble d'entraînement **d_ent**, à l'heure $i$,
+- **d_test_ouvre_i** pour $i=0,\dots,23$, où l'on n'a gardé que les jours ouvrés dans l'ensemble de validation **d_test**, à l'heure $i$.
 
 ## 2 Évaluation des modèles : quelques repères
 
 Pour évaluer la performance de nos modèles, nous introduisons la classique perte quadratique (RMSE), et également l'erreur absolue moyenne en pourcentage (MAPE), que nous allons majoritairement exploiter en tant que grandeur "absolue" sans dimension :
 
-$$\text{RMSE}(\varepsilon) = \sqrt{\frac{1}{T}\sum_{i=1}^T \varepsilon_i^2},$$
-et
-$$\text{MAPE}(Y,\hat{Y}) = 100 \times \frac{1}{T}\sum_{i=1}^T\left \lvert \frac{Y_i-\hat{Y}_i}{Y_i}\right \rvert.$$
+$$\text{RMSE}(\varepsilon) = \sqrt{\frac{1}{T}\sum_{i=1}^T \varepsilon_i^2}, ~~~~~\mbox{ et }~~~~~\text{MAPE}(Y,\hat{Y}) = 100 \times \frac{1}{T}\sum_{i=1}^T\left \lvert \frac{Y_i-\hat{Y}_i}{Y_i}\right \rvert.$$
 
 Pour avoir une idée du positionnement de nos modèles en termes de performance, et de l'utilité de recourir au machine learning pour répondre à notre problème, nous pouvons nous comparer :
 
-- au modèle naïf *à faire : je pensais à Load.48, est-ce que tu aurais d'autres idées ? _Je pense que c'est effectivement bien de prendre Load.48*
-- aux prévisions RTE : sur le jeu de données test (année 2019), on calcule les MAPE suivants pour **Forecast_RTE_intraday** pour les jours ouvrés (en pourcentage, dans l'ordre croissant par heure)
+- au modèle naïf donné par la consommation de la veille à la même heure, c'est-à-dire **Load.48**
+- aux prévisions RTE interjournalières, puisque notre prédiction est réalisée à partir de données de la veille au plus tard. Sur le jeu de données test (année 2019), on calcule les MAPE suivants pour **Forecast_RTE_dayahead** :
 
 ```{r, echo=FALSE, include=TRUE}
 mape_ouvre_RTE <- c()
@@ -160,16 +160,17 @@ for(i in c(1:H))
 {
   mape_ouvre_RTE <- c(mape_ouvre_RTE, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Forecast_RTE_dayahead))
 }
-mape_ouvre_RTE
+plot(mape_ouvre_RTE, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,2), lab=c(5,4,0), col="red")
+legend(x="bottomright", legend=c("RTE"), col=c("red"), pch=c(15))
+
 ```
 
 
-Soulignons que dans ses prévisions une heure à l'avance, RTE ne dispose que de prévisions météo, alors que nos modèles exploitent des valeurs de température effective, ce qui joue à notre avantage.
-*c'est bien une heure à l'avance, pour intraday*
+Obtenir une erreur comprise entre 1 et 2% est donc un bon objectif. Soulignons que dans ses prévisions de la veille au soir, RTE ne dispose que de prévisions météo, alors que nos modèles exploitent des valeurs de température effective, ce qui joue à notre avantage.
 
 ## 3 Forêts aléatoires
 
-Un premier modèle assez adapté à notre problématique est celui des forêts aléatoires. Dans un premier temps, nous avons entraîné une forêt sur l'ensemble des données, sans la séparation des heures et des jours ouvrés/week-ends. Nous obtenons un MAPE de 1.8% sur les données test. Nous avons ensuite séparé les données conformément à la partie 1.3, et les résultats sont nettement meilleurs : c'est donc ce choix que nous développons dans cette partie. Nous avons utilisé le package *ranger*, et mis dans chaque modèle toutes les variables explicatives potentiellement pertinentes.
+Un premier modèle assez adapté à notre problématique est celui des forêts aléatoires. Dans un premier temps, nous avons entraîné une forêt sur l'ensemble des données, sans la séparation des heures et des jours ouvrés/week-ends. Nous obtenons un MAPE de 1.8% sur les données test. Nous avons ensuite séparé les données conformément à la partie 1.3, et les résultats sont nettement meilleurs : c'est donc ce choix que nous développons dans cette partie. Nous avons utilisé le package  *ranger*, et mis dans chaque modèle toutes les variables explicatives potentiellement pertinentes.
 
 ### 3.1 Choix des paramètres
 
@@ -183,14 +184,14 @@ knitr::include_graphics('FIGURES/choix_mtry_forets.png')
 ```
 
 
-- **min.node.size** : les fluctuations de RMSE induites par le changement de ce paramètre sont faibles, d'après la courbe ci-dessous. Nous laissons donc **min.node.size** à sa valeur par défaut (5).
+- **min.node.size** : nombre minimal d'observations dans chaque noeud. Les fluctuations de RMSE induites par le changement de ce paramètre sont faibles, d'après la courbe ci-dessous. Nous laissons donc **min.node.size** à sa valeur par défaut (5).
 
 ```{r, out.width='80%', fig.align='center', fig.show='hold', echo = F}
 knitr::include_graphics('FIGURES/choix_minnode_forets.png')
 ```
 
 
-- **num.trees** : au vu de la courbe ci-dessous, nous choisissons de prendre 150 arbres, ce qui est un peu au-delà de la valeur où la courbe forme un coude, mais nous pouvons nous le permettre car nos jeux de données par heure ne sont pas très volumineux.
+- **num.trees** : nombre total d'arbres de la forêt. Au vu de la courbe ci-dessous, nous choisissons de prendre 150 arbres, ce qui est un peu au-delà de la valeur où la courbe forme un coude, mais nous pouvons nous le permettre car nos jeux de données par heure ne sont pas très volumineux.
 
 ```{r, out.width='80%', fig.align='center', fig.show='hold', echo = F}
 knitr::include_graphics('FIGURES/choix_ntree_forets.png')
@@ -200,16 +201,12 @@ knitr::include_graphics('FIGURES/choix_ntree_forets.png')
 
 ### 3.2 Entraînement et évaluation des modèles
 
-Une fois les paramètres choisis, nous pouvons entraîner nos modèles.
+Une fois les paramètres choisis, nous pouvons entraîner nos modèles, en prenant toutes les covariables potentiellement intéressantes. Nous affichons le code pour un seul jeu de données, pour plus de lisibilité :
 
 ```{r, eval=FALSE, echo=TRUE}
-formule_1 <- "Load ~ Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp+Temp_s95_min+Temp_s95_max+Temp_s99_min+Temp_s99_max"
+formule <- "Load ~ Temp_s99+toy+WeekDays+Temp_s95+Load.48+Christmas_break+Summer_break+DLS+Temp+Temp_s95_min+Temp_s95_max+Temp_s99_min+Temp_s99_max"
 
-# calcul des modèles
-for(i in c(1:H))
-{
-  assign(paste("foret_ouvre", i, sep="_"), ranger(formule_1, data=eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), importance = "permutation", num.trees = 150, mtry=8))
-}
+foret_ouvre_0 <- ranger(formule, data = d_ent_ouvre_0, importance = "permutation", num.trees = 150, mtry = 8)
 ```
 
 ```{r, echo=FALSE}
@@ -236,10 +233,10 @@ legend(x="bottomright", legend=c("foret","RTE"), col=c("blue","red"), pch=c(15,1
 
 ### 3.3 Importance des variables
 
-Enfin, les forêts aléatoires nous permettent de visualiser l'importance des différentes variables explicatives, ci-dessous sur le modèle **foret_ouvre_1**.
+Enfin, les forêts aléatoires nous permettent de visualiser l'importance des différentes variables explicatives, ci-dessous sur le modèle **foret_ouvre_0**.
 
 ```{r, echo=FALSE, include=TRUE}
-vip(foret_ouvre_1, num_features=13)
+vip(foret_ouvre_0, num_features=13)
 ```
 
 On observe que la consommation de la veille et les différentes transformations de la température sont les variables déterminantes.
