@@ -6,4 +6,6 @@ arbres_cart.R
 boosting.R
 forets_aleatoires.R
 gam_propre.R
+MODELES/*.rda
 *.html
+.DS_Store
