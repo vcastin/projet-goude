@@ -158,7 +158,7 @@ Pour avoir une idée du positionnement de nos modèles en termes de performance,
 mape_ouvre_RTE <- c()
 for(i in c(1:H))
 {
-  mape_ouvre_RTE <- c(mape_ouvre_RTE, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Forecast_RTE_intraday))
+  mape_ouvre_RTE <- c(mape_ouvre_RTE, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Forecast_RTE_dayahead))
 }
 mape_ouvre_RTE
 ```
@@ -376,8 +376,7 @@ On peut alors le tester sur l'année suivante pour voir si notre GAM possède de
 
 ###analyse plus fine : GAM avec découpage heure par heure
 
-Les GAM sont des modèles particulièrement adaptés à la prédiction de la consommation d'électricité. 
-
+Dans cette partie, on ne se contente plus d'un unique modèle GAM pour faire nos prédictions mais on décide d'en faire un par heure. Ce choix est motivé d'une part par l'importance de la variable **tod** et d'autre part par le fait qu'on imagine qu'il y a de nombreuses intercorrélations entre l'heure et les autres features. Par exemple il est légitime d'imaginer que la **Température** ne va pas avoir le même effet sur la consommation la nuit qu'en journée. C'est donc pour toutes ces raisons que nous avons décidé de construire ces 24 models en réutilisant l'équation obtenu précédemment.
 
 
 ```{r, echo=FALSE}
@@ -395,18 +394,10 @@ for(i in c(1:H))
 {
   mape_ouvre <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_ouvre", i, sep="_")))))
 }
-
-# mape_ouvre  # max = 1.55, min = 1.33
-
-plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
-lines(mape_ouvre_RTE, col="red")
-legend(x="bottomright", legend=c("GAM","RTE"), col=c("blue","red"), pch=c(15,15))
-
-
-
 ```
 
-Nous affichons l'attache aux données et la prédiction pour le modèle **gam_ouvre_12**.
+
+Pour des raisons de visibilité, nous affichons l'attache aux données et la prédiction pour le modèle **gam_ouvre_12** et par conséquent nous limitons notre analyse à midi. Dans ces plot, on remarque que l'on fit presque parfaitement les données d'entraînement ce qui pourrait présager d'un potentiel surapprentissage. Pour autant, il n'en est rien puisqu'on voit dans la figure de droite que notre prédiction est elle aussi très proche de la consommation effective. On peut dors et déjà dire que ce découpage par heure est une réussite. 
 
 ```{r, echo=FALSE, include=TRUE}
 # midi
@@ -436,6 +427,26 @@ fit1 <- getViz(gam_ouvre_cr_12, nsim = 50)
 # ordre variables : Load48, Temp95, Temp99, Temp, toy
 
 ```
+On peut tout de même avoir envie de comparer ces performances avec notre précédant GAM. Même si ce n'est pas évident à cette échelle, on remarque tout de même une légère amélioration de la version où on décomposer heure par heure même si la différence est telle qu'il faudrait un indicateur tel que le **MAPE** pour vraiment lequel de ces deux models est meilleur à midi.
+
+```{r, echo=FALSE, include=TRUE}
+# midi
+predictgam_midi<-predict(gtot,newdata=filter(d_test_ouvre,tod==24))
+# affichage sur les données test
+plot(d_test_ouvre_12$toy, d_test_ouvre_12$Load, main = "Validation jours ouvrés à midi",axes=FALSE, xlab = "Date (année 2019)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0),ylim=c(min(d_plot_ouvre_12$Load)-5000,max(d_plot_ouvre_12$Load)+5000))
+axis(2, las=0)
+lines(d_test_ouvre_12$toy, pred_ouvre_12, col='red')
+lines(d_test_ouvre_12$toy, predictgam_midi, col='green')
+legend(x="bottomleft", legend=c("données","gam_ouvre_12","gam à midi"), col=c("black","red","green"), pch=c(15,15,15))
+axis(1, at = seq,labels = c("Jan", "Mar", "May", "Jul", "Sep", "Nov","Jan"))
+# affichage des différentes splines
+fit1 <- getViz(gam_ouvre_cr_12, nsim = 50)
+# ordre variables : Load48, Temp95, Temp99, Temp, toy
+
+```
+
+
+Comme dans la partie précédante, on s'intéresse aux fonctions des différentes features. On remarque alors que la dépendance est globalement la même qu'avec le GAM sans découpage heure par heure ce qui justifie le fait de ne pas avoir à refaire le travail sur le choix de **k** et de la base de splines.
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 plot(sm(fit1, 1), n = 400) + l_points() + l_fitLine() + l_ciLine()
@@ -445,16 +456,34 @@ plot(sm(fit1, 4), n = 400) + l_points() + l_fitLine() + l_ciLine()
 plot(sm(fit1, 5), n = 400) + l_points() + l_fitLine() + l_ciLine()
 
 ```
+Maintenant, il s'agit d'obtenir le **MAPE** en fonction de leur de ces GAMs et de le comparer à des références, ici on prend la prévision *dayahead* de **RTE** ainsi que celle du GAM sans découpage. La première remarque que l'on peut faire est que 
 
-```{r, echo=FALSE, include=TRUE}
-gam.check(gam_ouvre_cr_12)
+```{r, echo=FALSE}
+# mape_ouvre  # max = 1.55, min = 1.33
+mape_gam<-list()
+
+# for(i in c(1:H))
+# {
+#   predictgam_i<-predict(gtot,newdata=filter(d_test_ouvre,Hour==i))
+#   mape_gam <- c(mape_ouvre, mape(eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load, eval(parse(text=paste("pred_ouvre", i, sep="_")))) )
+# }
+# 
+# mape_gam<-list()
+
+# for(i in c(1:H))
+# {
+#   predictgam_i<-predict(gtot,newdata=filter(d_test_ouvre,Hour==i))
+#   mape_gam <-  mape(predictgam_i$Load, eval(parse(text=paste("pred_ouvre", i, sep="_"))))
+# }
+
+
+plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
+lines(mape_ouvre_RTE, col="red")
+legend(x="bottomright", legend=c("GAM","RTE"), col=c("blue","red"), pch=c(15,15))
+
 ```
 
-*faire une figure avec attaches aux données et validation pour chaque type de modèle, pour pouvoir comparer*
 
-*mettre le code des figures à part*
-
-*étudier les résidus*
 
 ## 5 Boosting
 
@@ -646,12 +675,10 @@ hist(resid, xlab = "Residuals", main = "Histogram of residuals")
 
 Pour autant, si on s'attarde sur le diagramme quantile/quantile, on remarque que pour les valeurs extrêmes cela est moins vrai.
 
-```{r,echo=FALSE}
-split.screen(1:2)
-screen(1)
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
+
 qq.gam(gam_quantile, rep = 0, level = 0.9, type = type, rl.col = 2, 
        rep.col = "gray80")
-screen(2)
 
 plot(linpred, resid, main = "Resids vs. linear pred.", 
      xlab = "linear predictor", ylab = "residuals")
