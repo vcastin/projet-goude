@@ -42,21 +42,22 @@ mape <- function(y,ychap)
 
 qu_target <- seq (0.05,0.95,0.05)
 
-data_train_1<-d_ent_ouvre_1 # d_ent_ouvre_0
-data_test_1<-d_test_ouvre_1 # d_test_ouvre_0
-equation <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)+Lundi+Mardi+Mercredi+Jeudi +s(Temp_s95_min)+s(Temp_s95_max)+s(Temp_s99_min)+s(Temp_s99_max)#+Vendredi #Je crois que si je mets tous les indicatrices de jours ca bug donc on va laisser comme ca (j'avais eu le même pb avant mais jsp comment je l'avais résolu)
+data_train_0 <- d_ent_ouvre_0
+data_test_0 <- d_test_ouvre_0
+equation <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)+Lundi+Mardi+Mercredi+Jeudi+s(Temp_s95_min)+s(Temp_s95_max)+s(Temp_s99_min)+s(Temp_s99_max)#+Vendredi #Je crois que si je mets tous les indicatrices de jours ca bug donc on va laisser comme ca (j'avais eu le même pb avant mais jsp comment je l'avais résolu)
 
-qgam_l_1<- mqgam(form = list(equation,~ s(Temp)), data = data_train_1, qu = qu_target)
+qgam_l_0 <- mqgam(form = list(equation,~ s(Temp)), data = data_train_0, qu = qu_target)
 
-Viz_1 <- getViz(qgam_l_1)
+Viz_0 <- getViz(qgam_l_0)
 
-data_train_24<-d_ent_ouvre_24 #d_ent_ouvre_12
-data_test_24<-d_test_ouvre_24 #d_test_ouvre_12
+data_train_12 <- d_ent_ouvre_12
+data_test_12 <- d_test_ouvre_12
 
-qgam_l_24<- mqgam(form = list(equation,~ s(Temp)), data = data_train_24, qu = qu_target)
+qgam_l_12 <- mqgam(form = list(equation,~ s(Temp)), data = data_train_12, qu = qu_target)
 
-Viz_24 <- getViz(qgam_l_24)
-save(Viz_1,Viz_24,qu_target,equation,file="MODELES/qgam_midi")
+Viz_12 <- getViz(qgam_l_12)
+
+save(Viz_0, Viz_12, qu_target, equation, file="MODELES/qgam.rda")
 
 # 
 # for(i in c(1:H))

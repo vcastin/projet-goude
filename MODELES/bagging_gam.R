@@ -70,10 +70,13 @@ n <- nrow(d_ent_ouvre_0)
 gam.bagg_0 <- bagging(Nbag, data_app=d_ent_ouvre_0, equation, size=floor(0.8*n))
 
 #### calcul des prédictions
-for(i in c(1:Nbag))
-{
-  assign(paste("pred_gam_bagg0", i, sep="_"), predict(gam.bagg_0[i], newdata = d_test_ouvre_0))
-}
+# for(i in c(1:Nbag))
+# {
+#   assign(paste("pred_gam_bagg0", i, sep="_"), predict(gam.bagg_0[i], newdata = d_test_ouvre_0))
+# }
+
+pred_gam_bagg0 <-lapply(gam.bagg_0, predict, newdata=d_test_ouvre_0)
+pred_gam_bagg0 <- matrix(unlist(pred_gam_bagg0), ncol=Nbag, nrow=nrow(d_test_ouvre_0), byrow =FALSE)
 
 
 ######### sur d_ent_ouvre_12
@@ -87,10 +90,13 @@ n <- nrow(d_ent_ouvre_12)
 gam.bagg_12 <- bagging(Nbag, data_app=d_ent_ouvre_12, equation, size=floor(0.8*n))
 
 #### calcul des prédictions
-for(i in c(1:Nbag))
-{
-  assign(paste("pred_gam_bagg12", i, sep="_"), predict(gam.bagg_12[i], newdata = d_test_ouvre_12))
-}
+# for(i in c(1:Nbag))
+# {
+#   assign(paste("pred_gam_bagg12", i, sep="_"), predict(gam.bagg_12[i], newdata = d_test_ouvre_12))
+# }
+
+pred_gam_bagg12 <-lapply(gam.bagg_12, predict, newdata=d_test_ouvre_12)
+pred_gam_bagg12 <- matrix(unlist(pred_gam_bagg12), ncol=Nbag, nrow=nrow(d_test_ouvre_12), byrow =FALSE)
 
 # sauvegarde
 save(list = ls(all = TRUE), file= "MODELES/bagging_gam.rda")
