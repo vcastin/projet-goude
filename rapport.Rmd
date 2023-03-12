@@ -695,7 +695,7 @@ Par conséquent, un model que l'on a naturellement envie de prendre pour prédir
 ```{r, echo=FALSE , include=FALSE}
 #load("/Users/guillaumeprincipato/Desktop/Orsay/Cours/Semestre\ 1/Projet\ ML\ Goude/ProjetDataMining/datapropre")
 #load("/Users/guillaumeprincipato/Desktop/Orsay/Cours/Semestre\ 1/Projet\ ML\ Goude/ProjetDataMining/qgam_0.05...0.95")
-load("MODELES/qgam_midi")
+load("MODELES/qgam.rda")
 load("DONNEES/data.rda")
 
 ```
@@ -708,12 +708,12 @@ Lequation <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)+s(Temp_s95
 et on peut vérifier que l'hypothèse de normalité des résidus est loin d'être délirante lorsqu'on regarde l'histogramme des résidus qui semble correspondre quasi parfaitement :
 
 ```{r, echo=FALSE}
-data_train<-d_ent_ouvre_24
-data_test<-d_test_ouvre_24
+data_train<-data_train_12
+data_test<-data_test_12
 
 #On fait les prévisions avec qgam
 
-qgam.preds <- sapply(Viz_24, predict, newdata = data_test)
+qgam.preds <- sapply(Viz_12, predict, newdata = data_test)
 qgam.pl <- pinLoss(data_test$Load, qgam.preds, qu=qu_target)
 
 
@@ -804,10 +804,11 @@ title(main="Prévision quantile GAM + normale",xlab="Date",ylab="Consommation")
 legend("top", inset = 0., pch =19, legend = levels(zfac), col = mescouleurs)
 
 ```
+On remarque que les différents quantiles sont de simples translation de notre GAM ce qui est évident mais bon a rappelé dans le cas des quantiles GAM+normale
 
 ### 6.3 QGAM
 
-Comme évoqué précédemment, le model décrit dans la partie précédante n'est qu'une approche naïve car dans notre cas, c'est clair que la variance ne va pas être la même selon si la consommation est importante ou pas. Par conséquent, nous avons choisi d'utiliser des QGAMs qui est une méthode qui s’affranchit du cadre paramétrique dans lequel les GAMs étaient contraints en utilisant des méthodes de calibrations Bayesiennes (@Manual). Pour ce faire, le model est entraîné à partir d'une fonction de perte classique : 
+Comme évoqué précédemment, le model décrit dans la partie précédante n'est qu'une approche naïve car dans notre cas, il est clair que la variance n'est pas la même selon si la consommation est importante ou non. Par conséquent, nous avons choisi d'utiliser des QGAMs qui est une méthode qui s’affranchit du cadre paramétrique dans lequel les GAMs étaient contraints en utilisant des méthodes de calibrations Bayesiennes (@Manual) ce qui va permettre à la variance de ne plus être une simple constante. Pour ce faire, le model est entraîné à partir d'une fonction de perte classique dès lors que l'on s'intéresse au quantile à savoir la Pinball Loss : 
 
 ```{r, echo=FALSE}
 n <- 1000
@@ -823,9 +824,8 @@ for (qu in qu_targetbis) {
 }
 j<-1
 ```
-
-On peut là encore faire le même type de plot que dans la partie 5.2 et on remarque que les tracés ont l'air plus complexes et plus adaptés à la réalité des données.
-
+On entraîne alors nos QGAMs selon les mêmes features que notre GAM pour avoir une bonne base de comparaison. A noté que la compilation est logique compte-tenu du fait que le problème non-paramétrique soit évident plus complexe à résoudre qu'un "simple" GAM.
+Pour visualiser le résultat, on peut là encore faire le même type de plot que dans la partie 5.2 et on remarque que les tracés ont l'air plus complexes et plus adaptés à la réalité des données. En effet, la courbe des quantiles les plus élevés à des variations de plus faibles amplitude que pour les autres quantiles. Une interprétation de ce phénomène pourrait-être que, comme cela est particulièrement visible en de juin à août, en été les consommations particulièrement élevé se propagent bien dans le temps, par exemple en période de canicule avec l'utilisation de la climatisation plusieurs jours de suite (ce n'est qu'une tentative d'interprétation).
 ```{r, echo=FALSE}
 qu_targetbis<-c(0.05,0.45,0.50,0.55,0.9)
 zfac <- factor(qu_targetbis)
@@ -840,28 +840,34 @@ lines(data_test$Date, qgam_predicteurs[[19]], col=mescouleurs[5])
 title(main="Prévision quantile QGAM",xlab="Date",ylab="Consommation")
 legend("top", inset = 0., pch =19, legend = levels(zfac), col = mescouleurs)
 ```
-
-Intuitivement, on se dit que QGAM donne de meilleur résultat que GAM+normale mais reste à trouver un critère qui permet de les comparer. Dans un premier temps nous nous sommes dis que compter le nombre de données du dataset de test qui sont au dessus du quantile q mais cette approche ne mesure pas vraiment ce que l'on veut.
-Nous avons donc décidé d'utiliser ici uniquement un critère plus pertinent à savoir la pinball loss sur les données d'entraînement et d'afficher le ratio entre les deux méthodes : $$ratio(quantile) = \frac{pinball(qgam(quantile))}{pinball(gam_+normale(quantile))}$$
+### 6.4 Comparaison entre la méthode naïve et les QGAM
+Intuitivement, on se dit que QGAM doit donner de meilleurs résultats que GAM+normale mais reste à trouver un critère qui permette de les comparer. Dans un premier temps nous nous sommes dis que nous pouvions compter le nombre de données du dataset de test qui sont au dessus du quantile q mais cette approche ne mesure pas vraiment ce que l'on veut.
+Nous avons donc décidé d'utiliser ici uniquement un critère plus pertinent à savoir la Pinball Loss sur les données d'entraînement et d'afficher le ratio entre les deux méthodes : $$ratio(quantile) = \frac{pinball(qgam(quantile))}{pinball(gam_+normale(quantile))}$$
 
 ```{r, echo=FALSE}
 #Ratio à midi
 plot(qu_target,ratio_quantiles,main = "Ratio", xlab="quantile", ylab="ratio",type="l")
 y<-rep(1,length(qu_target))
 lines(qu_target,y, type="l",col="blue", lty=2)
-```
+mean<-0
+for (ratio in ratio_quantiles) {
+  mean<-mean+ratio
+}
+print(mean/19)
+#ratio_quantiles
+``` 
 
-Comme prévu, QGAM donne de meilleur résultat pour environ tous les quantiles. A noter toutefois que pour les quantiles entre 25% et 40% les quantiles de la loi normale donnent des résultats légèrement meilleur (de l'ordre d'1 à 2%) mais cela n'est pas comparable aux écarts allant jusqu'à plus de 10% pour le reste des quantiles (plus les quantiles sont extrêmes plus la différence de performance est grande). Par conséquent, on peut conclure que lorsqu'on s'intéresse aux quantiles extrêmes, QGAM est nécessaire car c'est justement pour ces données extrêmes que l'hypothèse de variance constante n'est plus viable. En revanche, GAM+normale peut être utilisé notamment dans des modèles d’agrégation d'expert puisqu'il est assez performant pour des quantiles proches de la médiane.
+Comme prévu, QGAM donne de meilleur résultat pour environ tous les quantiles. A noter toutefois que pour les quantiles entre 15% et 35% les quantiles de la loi normale donnent des résultats légèrement meilleur (de l'ordre d'1 à 3%) mais cela n'est pas comparable aux écarts allant jusqu'à plus de 10% pour le reste des quantiles (plus les quantiles sont extrêmes plus la différence de performance est grande). On a d'ailleurs un gain en moyenne de l'ordre de 5% des QGAMs sur l'approche naïve ce qui n'est pas négligeable. Par conséquent, on peut conclure que lorsqu'on s'intéresse aux quantiles extrêmes, QGAM est nécessaire car c'est justement pour ces données extrêmes que l'hypothèse de variance constante n'est plus viable. En revanche, GAM+normale peut être utilisé notamment dans des modèles d’agrégation d'expert puisqu'il est assez performant pour des quantiles proches de la médiane.
 
 
-### 6.4 Applications (Focus on 90%)
+### 6.5 Applications (Focus on 90%)
 
 Dans cette dernière sous-partie, nous allons regarder un cas d'application pour un quantile extrême à savoir 90 %. Dans le cas de l'électricité, on peut facilement imaginer des applications pour calibrer le parc électrique de sortes à ce qu'il puisse produire à moindre coût pour des consommations "habituelles". Dans un premier temps, on affiche les quantiles sur les données de test.
 
 ```{r, echo=FALSE , include=FALSE}
 #mauvais qgam
 
-equation1 <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)
+equation1 <- Load ~ s(Load.48)
 qgam_l1<- mqgam(form = list(equation1,~ s(Temp)), data = data_train, qu = c(0.5,0.9))
 Viz1 <- getViz(qgam_l1)
 qgam.preds1 <- sapply(Viz1, predict, newdata = data_test)
@@ -870,14 +876,16 @@ qgam.preds1 <- sapply(Viz1, predict, newdata = data_test)
 
 ```{r,echo=FALSE}
 plot(data_test$Date, data_test$Load, type='l',main = "", xlab="", ylab="",col="black")
-lines(data_test$Date, qgam_predicteurs[[18]], col="cyan") 
+lines(data_test$Date, qgam_predicteurs[[18]], col="red") 
 lines(data_test$Date, gam_normale_predicteurs[[18]], col="blue") 
-lines(data_test$Date, qgam.preds1[,"0.9"], col="purple") 
-legend("top",legend=c("data test","gam + normale 90%","qgam 90%","mauvais qgam (underfitting)"),col=c("black","cyan", "blue","purple"), lty=1:1:1:1)
+lines(data_test$Date, qgam.preds1[,"0.9"], col="green") 
+legend("top",legend=c("data test","GAM + normale 90%","QGAM 90%","mauvais QGAM (underfitting)"),col=c("black","red", "blue","green"), lty=1:1:1:1)
 
 ```
 
-Ce graphique illustre plusieurs choses d'intéressantes, à commencer par le fait qu'un mauvais qgam (qui ne prends pas en compte le jour de la semaine) n'épouse pas la forme de la courbe notamment dans les cas où la consommation est faible (probablement correspondant au week-end) mais que sinon il coïncide pas trop mal avec les deux autres. Sinon, le QGAM et le GAM+normale sont globalement similaire à l’œil nu (mais on a vu dans la partie 5.3 que QGAM avait une Pinball Loss plus faible d'environ 6%) mais il semblerait que le QGAM soit globalement plus proche de la courbe, ce qui, si on extrapole l'analyse faite du mauvais QGAM, doit être plutôt une bonne chose dans le cas présent. Bien que l'on ait dit que cela n'était pas vraiment pertinent, regardons la proportion des points du dataset de test qui sont au dessus de chacune des courbes : 
+Ce graphique illustre plusieurs choses d'intéressantes, à commencer par le fait qu'un mauvais QGAM (qui ne prends en compte que la consommation de la veille) n'épouse pas la forme de la courbe notamment dans les cas où la consommation est faible et semble faire n'importe de quoi de Mars à Avril en oscillant énormément ce qui ne semble pas être justifié (les pics correspondent probablement au lundi et au vendredi où les consommations de la veille ne sont pas pertinente à cause du week-end) mais que sinon les deux autres coïncident globalement et semblent plausibles. On peut tout de même remarquer que le QGAM 90% semble plus proche des données réelles ce qui pourrait expliquer l'écart de 6% au niveau du ratio pour le quantile 90%. 
+
+Pour conclure sur cette partie, bien que l'on ait dit que cela n'était pas vraiment pertinent, regardons la proportion des points du dataset de test qui sont au dessus de chacune des courbes : 
 
 ```{r, echo=FALSE}
 verifquantile<-function(y,ychap)
@@ -909,14 +917,15 @@ dataframe<-as.data.frame(cbind(verif_name,proportion_au_dessus))
 dataframe
 ```
 
-Cela ne va pas particulièrement dans le sens des observations faites précédemment ce qui confirme le fait que cette mesure est assez mauvais indicateur de la pertinence des quantiles. En effet, le mauvais QGAM à le même nombre de points au dessus que le bon tandis que c'est GAM+normae qui est le plus proche du quantile recherché. Par ailleurs on note que pour les grands quantiles et donc les consommation élevé, nos modèles semblent sous-estimer leur nombre. A l'inverse, pour les faibles quantiles (10%) on trouve une proportion de plus de 15%. On peut chercher une piste pour expliquer cette observation dans un changement de tendance en fonction de l'année invisible en moyenne mais significative pour les valeurs extrêmes.
+Cela ne va pas particulièrement dans le sens des observations faites précédemment ce qui confirme le fait que cette mesure est assez mauvais indicateur de la pertinence des quantiles. En effet, le mauvais QGAM à la proportion de point la plus proche du quantile que l'on vise bon tandis que le bon QGAM est le plus mauvais selon ce critère. Par ailleurs on note que pour les grands quantiles et donc les consommations élevés, nos modèles semblent sous-estimer leur nombre. A l'inverse, pour les faibles quantiles (10%) on trouve une proportion de plus de 15%. On peut chercher une piste pour expliquer cette observation dans un changement de tendance en fonction de l'année invisible en moyenne mais significative pour les valeurs extrêmes.
 ##Référence
 
 ```{r}
-d_tot<-rbind (d_ent_ouvre,d_test_ouvre)
+d_tot<-rbind (data_train_12,data_test_12)
 plot(d_tot$Date,d_tot$Load,type="l")
+lines(data_test_12$Date,data_test_12$Load, col="red")
 ```
-On Voit effectivement que nous testons nos données sur une année avec assez peu de concentration extremement élevés et à l'inverse plus de consommation très faibles. Pour autant, il n'y a clairement pas de tendance qui semblait annoncer cela et par conséquent on reste sur notre hypothèse selon laquelle l'année n'est pas une feature exploitable. 
+On Voit effectivement que nous testons nos données sur une année avec assez peu de consommation extrêmement élevés et à l'inverse plus de consommation très faibles. Pour autant, il n'y a clairement pas de tendance qui semblait annoncer cela et par conséquent on reste sur notre hypothèse selon laquelle l'année n'est pas une feature exploitable. 
 
 
 
