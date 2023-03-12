@@ -40,15 +40,23 @@ mape <- function(y,ychap)
   return(round(100*mean(abs(y-ychap)/abs(y)), digits=2))
 }
 
-data_train<-d_ent_ouvre_24
-data_test<-d_test_ouvre_24
 qu_target <- seq (0.05,0.95,0.05)
 
+data_train_1<-d_ent_ouvre_1 # d_ent_ouvre_0
+data_test_1<-d_test_ouvre_1 # d_test_ouvre_0
 equation <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)+Lundi+Mardi+Mercredi+Jeudi +s(Temp_s95_min)+s(Temp_s95_max)+s(Temp_s99_min)+s(Temp_s99_max)#+Vendredi #Je crois que si je mets tous les indicatrices de jours ca bug donc on va laisser comme ca (j'avais eu le même pb avant mais jsp comment je l'avais résolu)
-qgam_l<- mqgam(form = list(equation,~ s(Temp)), data = data_train, qu = qu_target)
 
-Viz <- getViz(qgam_l)
-save(Viz,qu_target,equation,file="MODELES/qgam_midi")
+qgam_l_1<- mqgam(form = list(equation,~ s(Temp)), data = data_train_1, qu = qu_target)
+
+Viz_1 <- getViz(qgam_l_1)
+
+data_train_24<-d_ent_ouvre_24 #d_ent_ouvre_12
+data_test_24<-d_test_ouvre_24 #d_test_ouvre_12
+
+qgam_l_24<- mqgam(form = list(equation,~ s(Temp)), data = data_train_24, qu = qu_target)
+
+Viz_24 <- getViz(qgam_l_24)
+save(Viz_1,Viz_24,qu_target,equation,file="MODELES/qgam_midi")
 
 # 
 # for(i in c(1:H))

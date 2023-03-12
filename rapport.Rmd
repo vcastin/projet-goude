@@ -713,7 +713,7 @@ data_test<-d_test_ouvre_24
 
 #On fait les prévisions avec qgam
 
-qgam.preds <- sapply(Viz, predict, newdata = data_test)
+qgam.preds <- sapply(Viz_24, predict, newdata = data_test)
 qgam.pl <- pinLoss(data_test$Load, qgam.preds, qu=qu_target)
 
 
@@ -897,7 +897,7 @@ verifquantile<-function(y,ychap)
   return (100*compteur/i)
   
 }
-D<-qgam_predicteursbis[[18]]
+
 verif1<-verifquantile(data_test$Load,qgam_predicteurs[[18]])
 verif2<-verifquantile(data_test$Load,gam_normale_predicteurs[[18]])
 verif3<-verifquantile(data_test$Load,qgam.preds1[,"0.9"])
@@ -909,9 +909,16 @@ dataframe<-as.data.frame(cbind(verif_name,proportion_au_dessus))
 dataframe
 ```
 
-Cela va dans le sens des observations faites précédemment et donc fait office de bon complément.
-
+Cela ne va pas particulièrement dans le sens des observations faites précédemment ce qui confirme le fait que cette mesure est assez mauvais indicateur de la pertinence des quantiles. En effet, le mauvais QGAM à le même nombre de points au dessus que le bon tandis que c'est GAM+normae qui est le plus proche du quantile recherché. Par ailleurs on note que pour les grands quantiles et donc les consommation élevé, nos modèles semblent sous-estimer leur nombre. A l'inverse, pour les faibles quantiles (10%) on trouve une proportion de plus de 15%. On peut chercher une piste pour expliquer cette observation dans un changement de tendance en fonction de l'année invisible en moyenne mais significative pour les valeurs extrêmes.
 ##Référence
+
+```{r}
+d_tot<-rbind (d_ent_ouvre,d_test_ouvre)
+plot(d_tot$Date,d_tot$Load,type="l")
+```
+On Voit effectivement que nous testons nos données sur une année avec assez peu de concentration extremement élevés et à l'inverse plus de consommation très faibles. Pour autant, il n'y a clairement pas de tendance qui semblait annoncer cela et par conséquent on reste sur notre hypothèse selon laquelle l'année n'est pas une feature exploitable. 
+
+
 
 @Manual{R-base,
   title = {qgam: Bayesian Nonparametric Quantile Regression Modeling in R},
