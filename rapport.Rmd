@@ -311,7 +311,7 @@ equation<-Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99
 
 ### Premier modèle GAM (sans découpage heure par heure)
 
-Dans cette partie, on va utiliser l'équation obtenue précédemment à laquelle on va ajouter les features discrètes à savoir le jour de la semaine et si on se trouve pendant les vacances d'été ou de Noel. Mais avant de regarder les résultats d'un tel GAM sur les données de test, on va regarder par cross-validation quelle base de spline utiliser globalement.
+Dans cette partie, on va utiliser l'équation obtenue précédemment et analyser les propriétés de généralisation de ce GAM en le testant sur l'année suivante. Mais avant cela, on justifie notre choix de base de spline par cross-validation. 
 
 ```{r, echo=FALSE}
 load("A_AFFICHER/splines_basis")
@@ -319,22 +319,15 @@ load("A_AFFICHER/splines_basis")
 knitr::kable(tableau,colors = c("black", "white"))
 ```
 
-On note que les résultats sont sensiblement les mêmes pour thin plate regression et pour cubic regression et légèrmeent moins bon pour cyclic cubic regression mais compte-tenu de ces résultats, on choisit pour la suite d'utiliser des splines de regression cubique. Toutefois, on fait remarqué q'une étude précise nécessiterait de faire ce travail pour trouver la meilleure base de splines adaptée à chaque variable. Cependant nous n'avons pas jugé cela utile aux vues des faibles différences de performance. 
+On note que les résultats sont sensiblement les mêmes pour thin plate regression et pour cubic regression et légèrement moins bon pour cyclic cubic regression. On décide donc a posteriori que notre choix de base **cr** est justifié car c'est celle qui donne le meilleur RMSE. Toutefois, on fait remarquer qu'une étude précise nécessiterait de faire ce travail pour trouver la meilleure base de splines adaptée à chaque variables. Cependant nous n'avons pas jugé cela pertinent aux vues des faibles différences de performance. 
 
-Désormais, on peut commencer à analyser les performances de notre "bon" GAM dans le cas où on ne fait pas encore un modèle par heure :
+Désormais, on peut commencer à analyser les performances de notre GAM dans le cas où on ne fait pas encore un modèle heure par heure. On plot donc les prévisions produites par notre model sur l'année 2019.
 
 ```{r, echo=FALSE}
 equation<-Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+s(Temp_s95_min, k=5, bs="cr")+s(Temp_s99_min, k=5, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr")+s(toy,k=14)+Christmas_break+Summer_break
 
 gtot <- gam(equation, data=d_ent_ouvre)
-plot(d_ent_ouvre$Load, gtot$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
-fittot <- getViz(gtot, nsim = 50)
-
 ```
-
-On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un trop grand nombre de paramètres. De plus, les résidus ressemblent désormais bien à du bruit et donc semblent ne plus réellement contenir d'information.
-
-On peut alors le tester sur l'année suivante pour voir si notre GAM possède de bonnes propriétés de généralisation.
 
 
 ```{r, echo=FALSE}
@@ -345,29 +338,41 @@ lines(d_test_ouvre$Date,predictgam, xlab = "Date", ylab = "Consommation (MWh)", 
 legend(x="bottomright", legend=c("Donnée Réel","RTE","GAM"), col=c("black","blue","red"), pch=c(15,15,15))
 ```
 
-On voit dans ce plot annuelle que notre prédiction semble globalement collé à la consommation réelle, pour autant cette échelle ne permet pas une analyse fine donc on va s'attarder plutôt sur un mois en particulier, ici le mois de Décembre.
+On voit dans ce plot annuelle que notre prédiction semble globalement correspondre à la consommation réelle, pour autant cette échelle ne permet pas une analyse fine donc on va s'attarder plutôt sur un mois en particulier, on choisit arbitrairement le mois de Décembre en nous disant que c'est un mois intéressant dans le sens où la prévision est près d'un an après la dernière donnée d'entraînement et que la consommation est assez mouvementée en décembre notamment de par les chutes de température.
 
 
 ```{r, echo=FALSE}
 n <- 12048-48*21+1
 m <- 12048
 d_test_plot <- d_test_ouvre[n:m,]
-
 predictgamdecembre<-predict(gtot,newdata=d_test_plot)
 plot(d_test_plot$Load, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="black",axes=FALSE, ylim=c(min(d_test_plot$Load)-5000,max(d_test_plot$Load)+5000)) 
 par(mar=c(5, 5, 4, 2) + 0.0) #ajustement de la marge gauche
-axis(2, las=1)
+axis(2, las=0)
 lines(d_test_plot$Forecast_RTE_intraday, xlab = "", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="blue") 
 lines(predictgamdecembre, xlab = "", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="red")
 legend(x="bottomright",legend=c("Donnée Réel","RTE","GAM"), col=c("black","blue","red"), pch=c(15,15,15))
 #axis.Date(1, at=d_test_plot$Load, labels=d_test_plot$Date)
-seq<-seq(0,1000,1000/6)
+seq<-seq(0,1000,1000/4)
 axis(1, at = seq,
-     labels = c("Jan", "Mar", "May", "Jul", "Sep", "Nov","Jan"),tck = -0.02,tcl = 0)
-par(mgp = c(3, 0.5, 0))
+     labels = c("1 Dec", "8 Dec", "15 Dec", "22 Dec", "28 Dec"))
+
 
 
 ```
+
+
+```{r, echo=FALSE}
+
+plot(d_ent_ouvre$Load, gtot$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
+fittot <- getViz(gtot, nsim = 50)
+
+```
+
+On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un trop grand nombre de paramètres. De plus, les résidus ressemblent désormais bien à du bruit et donc semblent ne plus réellement contenir d'information.
+
+On peut alors le tester sur l'année suivante pour voir si notre GAM possède de bonnes propriétés de généralisation.
+
 
 ###analyse plus fine : GAM avec découpage heure par heure
 
@@ -397,6 +402,8 @@ plot(mape_ouvre, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019
 lines(mape_ouvre_RTE, col="red")
 legend(x="bottomright", legend=c("GAM","RTE"), col=c("blue","red"), pch=c(15,15))
 
+
+
 ```
 
 Nous affichons l'attache aux données et la prédiction pour le modèle **gam_ouvre_12**.
@@ -410,20 +417,27 @@ mape(d_test_ouvre_12$Load,pred_ouvre_12)
 # affichage sur les données d'entraînement
 d_plot_ouvre_12 <- filter(d_ent_ouvre_12, Year=="2018")
 g_plot_ouvre_12 <- predict(gam_ouvre_cr_12, newdata = d_plot_ouvre_12)
-plot(d_plot_ouvre_12$toy, d_plot_ouvre_12$Load, main = "Entraînement jours ouvrés à midi", xlab = "Date (année 2018)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0))
+plot(d_plot_ouvre_12$toy, d_plot_ouvre_12$Load, main = "Entraînement jours ouvrés à midi",axes=FALSE, xlab = "Date (année 2018)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0),ylim=c(min(d_plot_ouvre_12$Load)-5000,max(d_plot_ouvre_12$Load)+5000))
+axis(2, las=0)
 lines(d_plot_ouvre_12$toy, g_plot_ouvre_12, col='red')
 legend(x="bottomleft", legend=c("données","gam_ouvre_12"), col=c("black","red"), pch=c(15,15))
+seq<-seq(0,1,1/6)
+axis(1, at = seq,labels = c("Jan", "Mar", "May", "Jul", "Sep", "Nov","Jan"))
+
 
 # affichage sur les données test
-plot(d_test_ouvre_12$toy, d_test_ouvre_12$Load, main = "Validation jours ouvrés à midi", xlab = "Date (année 2019)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0))
+plot(d_test_ouvre_12$toy, d_test_ouvre_12$Load, main = "Validation jours ouvrés à midi",axes=FALSE, xlab = "Date (année 2019)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0),ylim=c(min(d_plot_ouvre_12$Load)-5000,max(d_plot_ouvre_12$Load)+5000))
+axis(2, las=0)
 lines(d_test_ouvre_12$toy, pred_ouvre_12, col='red')
 legend(x="bottomleft", legend=c("données","gam_ouvre_12"), col=c("black","red"), pch=c(15,15))
-
+axis(1, at = seq,labels = c("Jan", "Mar", "May", "Jul", "Sep", "Nov","Jan"))
 # affichage des différentes splines
 fit1 <- getViz(gam_ouvre_cr_12, nsim = 50)
 # ordre variables : Load48, Temp95, Temp99, Temp, toy
-par(mfrow = c(3,2))
 
+```
+
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 plot(sm(fit1, 1), n = 400) + l_points() + l_fitLine() + l_ciLine()
 plot(sm(fit1, 2), n = 400) + l_points() + l_fitLine() + l_ciLine()
 plot(sm(fit1, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()
