@@ -520,14 +520,18 @@ On obtient un R2 de près de 92% donc l'amélioration est notable, d'autant plus
 g3 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr"), data=d_ent_ouvre)
 plot(d_ent_ouvre$Load, g3$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
 fit3 <- getViz(g3, nsim = 50)
-#summary(g3)
 ```
+
+
 On obtient un R2 de plus de 97% et on remarque que même si on laisse un grand degré de liberté pour la dépendance en toy (k=48) cela n'améliore pas le modèle. Cela justifie le fait de faire un modèle par heure plutôt qu'un par demi-heure. 
 On traite à part le cas de toy puisque le degré de liberté est moins facilement paramétrable, on décide donc de trouver k par cross validation :
 
 ```{r, echo=FALSE}
 load("A_AFFICHER/cross_validation")
-plot(K, rmseK, type='b', pch=20)
+plot(K, rmseK, type='b', pch=20,main="",xlab="",ylab="")
+points(K[12],rmseK[12],col="red")
+title(main="Cross validation pour déterminer nombre de splines pour décrire la feature toy",xlab="dimension de la base de spline (k)",ylab="RMSE (obtenu par block")
+legend(x="topright",legend=c("k=14"),col=c("red"),pch=c(20))
 ```
 On choisit donc k=14 par technique du coude. On réutilisera une cross-validation pour définir la base de spline que l'on va utiliser au final. Mais avant ça on calcul le gam final avec les degrés de liberté obtenus dans cette partie
 
@@ -538,7 +542,8 @@ Dans cette partie, on va utiliser l'équation obtenue précédemment à laquelle
 
 ```{r, echo=FALSE}
 load("A_AFFICHER/splines_basis")
-tableau
+#tableau
+knitr::kable(tableau,colors = c("black", "white"))
 ```
 
 On note que les résultats sont sensiblement les mêmes pour thin plate regression et pour cubic regression et légèrmeent moins bon pour cyclic cubic regression mais compte-tenu de ces résultats, on choisit pour la suite d'utiliser des splines de regression cubique. Toutefois, on fait remarqué q'une étude précise nécessiterait de faire ce travail pour trouver la meilleure base de splines adaptée à chaque variable. Cependant nous n'avons pas jugé cela utile aux vues des faibles différences de performance. 
@@ -551,8 +556,6 @@ equation<-Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99
 gtot <- gam(equation, data=d_ent_ouvre)
 plot(d_ent_ouvre$Load, gtot$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
 fittot <- getViz(gtot, nsim = 50)
-summary(gtot)
-
 
 ```
 On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un trop grand nombre de paramètres. De plus, les résidus ressemblent désormais bien à du bruit et donc semblent ne plus réellement contenir d'information.
@@ -576,11 +579,18 @@ m <- 12048
 d_test_plot <- d_test_ouvre[n:m,]
 
 predictgamdecembre<-predict(gtot,newdata=d_test_plot)
-plot(d_test_plot$Load, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="black") 
-lines(d_test_plot$Forecast_RTE_intraday, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="blue") 
-lines(predictgamdecembre, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="red")
-legend(x="bottomright", legend=c("Donnée Réel","RTE","GAM"), col=c("black","blue","red"), pch=c(15,15,15))
+plot(d_test_plot$Load, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="black",axes=FALSE, ylim=c(min(d_test_plot$Load)-5000,max(d_test_plot$Load)+5000)) 
+par(mar=c(5, 5, 4, 2) + 0.0) #ajustement de la marge gauche
+axis(2, las=1)
+lines(d_test_plot$Forecast_RTE_intraday, xlab = "", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="blue") 
+lines(predictgamdecembre, xlab = "", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="red")
+legend(x="bottomright",legend=c("Donnée Réel","RTE","GAM"), col=c("black","blue","red"), pch=c(15,15,15))
 #axis.Date(1, at=d_test_plot$Load, labels=d_test_plot$Date)
+seq<-seq(0,1000,1000/6)
+axis(1, at = seq,
+     labels = c("Jan", "Mar", "May", "Jul", "Sep", "Nov","Jan"),tck = -0.02,tcl = 0)
+par(mgp = c(3, 0.5, 0))
+
 
 ```
 
@@ -853,7 +863,7 @@ mean<-0
 for (ratio in ratio_quantiles) {
   mean<-mean+ratio
 }
-print(mean/19)
+#print(mean/19)
 #ratio_quantiles
 ``` 
 
@@ -879,6 +889,7 @@ plot(data_test$Date, data_test$Load, type='l',main = "", xlab="", ylab="",col="b
 lines(data_test$Date, qgam_predicteurs[[18]], col="red") 
 lines(data_test$Date, gam_normale_predicteurs[[18]], col="blue") 
 lines(data_test$Date, qgam.preds1[,"0.9"], col="green") 
+title(main="Comparaison des prédictions quantiles 90¨",xlab="Date",ylab="Consommation")
 legend("top",legend=c("data test","GAM + normale 90%","QGAM 90%","mauvais QGAM (underfitting)"),col=c("black","red", "blue","green"), lty=1:1:1:1)
 
 ```
@@ -914,7 +925,8 @@ proportion_au_dessus<-c(verif1,verif2,verif3)
 verif_name<-c("QGAM","GAM+normale","mauvais QGAM")
 dataframe<-as.data.frame(cbind(verif_name,proportion_au_dessus))
 
-dataframe
+knitr::kable(dataframe,colors = c("black", "white"))
+#dataframe
 ```
 
 Cela ne va pas particulièrement dans le sens des observations faites précédemment ce qui confirme le fait que cette mesure est assez mauvais indicateur de la pertinence des quantiles. En effet, le mauvais QGAM à la proportion de point la plus proche du quantile que l'on vise bon tandis que le bon QGAM est le plus mauvais selon ce critère. Par ailleurs on note que pour les grands quantiles et donc les consommations élevés, nos modèles semblent sous-estimer leur nombre. A l'inverse, pour les faibles quantiles (10%) on trouve une proportion de plus de 15%. On peut chercher une piste pour expliquer cette observation dans un changement de tendance en fonction de l'année invisible en moyenne mais significative pour les valeurs extrêmes.
@@ -922,8 +934,10 @@ Cela ne va pas particulièrement dans le sens des observations faites précédem
 
 ```{r}
 d_tot<-rbind (data_train_12,data_test_12)
-plot(d_tot$Date,d_tot$Load,type="l")
+plot(d_tot$Date,d_tot$Load,type="l",main = "", xlab="", ylab="", lwd=2)
 lines(data_test_12$Date,data_test_12$Load, col="red")
+title(main="Recherche de tendance",xlab="Date",ylab="Consommation")
+legend("top",legend=c("data test","data train"),col=c("black","red"), lty=1:1)
 ```
 On Voit effectivement que nous testons nos données sur une année avec assez peu de consommation extrêmement élevés et à l'inverse plus de consommation très faibles. Pour autant, il n'y a clairement pas de tendance qui semblait annoncer cela et par conséquent on reste sur notre hypothèse selon laquelle l'année n'est pas une feature exploitable. 
 
