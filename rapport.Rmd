@@ -796,6 +796,52 @@ On voit effectivement que nous testons nos données sur une année avec assez pe
 
 ## 8 Agrégation d'experts : va-t-on battre RTE ?
 
+```{r, echo=FALSE}
+load("MODELES/agregation.rda")
+```
+
+Dans cette dernière partie, nous procédons à l'agrégation de tous les experts entraînés précédemment, dans l'espoir d'obtenir une combinaison convexe qui soit plus performante que chaque modèle séparément. Nous utilisons l'algorithme MLpol du package opera. Les experts que nous donnons à l'algorithme sont les suivants :
+
+- foret aléatoire (partie 3.2)
+- GAM (partie 4.3)
+- boosting gbm (partie 5.1)
+- boosting xgb (partie 5.2)
+- stacking forêts et GAM (partie 6.1)
+- stacking boosting et GAM (partie 6.2)
+
+auxquels on ajoute :
+
+- QGAM aux quantiles 0.4, 0.45, 0.5, 0.55
+- 5 modèles GAM obtenus par bagging.
+
+Nous nous sommes limités à 5 modèles obtenus par bagging pour des raisons de temps de calcul, même si 10 aurait probablement été encore mieux.
+
+Nous obtenons la courbe de MAPE ci-dessous.
+
+```{r, echo=FALSE}
+plot(mape_agg, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
+lines(mape_ouvre_RTE, col="red")
+
+legend(x="bottomright", legend=c("agregation","RTE"), col=c("blue","red"), pch=c(15,15))
+```
+
+L'on voit que nous sommes légèrement au-dessus de la prédiction de RTE en termes d'erreur, mais les courbes se croisent en plusieurs points, et particulièrement la nuit ou très tôt le matin, quand la consommation est plus faible.
+
+Penchons-nous ensuite plus en détail sur une heure de la journée, par exemple midi. Nous obtenons les courbes suivantes.
+
+```{r, echo=FALSE, warning=FALSE}
+plot(agg.online_12, pause=F)
+```
+
+
+
+
+
+
+
+
+
+
 
 
 

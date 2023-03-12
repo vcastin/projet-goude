@@ -59,6 +59,21 @@ Viz_12 <- getViz(qgam_l_12)
 
 save(Viz_0, Viz_12, qu_target, equation, file="MODELES/qgam.rda")
 
+
+
+ ##### pour tous les modèles
+
+qu_target <- c(0.4, 0.45, 0.5, 0.55)
+
+equation <- Load ~ s(Load.48)+s(Temp_s95)+s(Temp_s99)+s(Temp)+s(toy)+Lundi+Mardi+Mercredi+Jeudi+s(Temp_s95_min)+s(Temp_s95_max)+s(Temp_s99_min)+s(Temp_s99_max)
+
+for(i in c(0:H)){
+  assign(paste("qgam_l", i, sep="_"), mqgam(form = list(equation,~ s(Temp)), data = eval(parse(text=paste("d_ent_ouvre", i, sep="_"))), qu = qu_target))
+  assign(paste("Viz", i, sep="_"), getViz(eval(parse(text=paste("qgam_l", i, sep="_")))))
+}
+
+save(list = ls(all = TRUE), file= "MODELES/qgam_tous.rda")
+
 # 
 # for(i in c(1:H))
 # {
