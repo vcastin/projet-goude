@@ -267,7 +267,7 @@ plot(sm(fit0, 1), n = 400, main = "dépendance en Load.48", xlab = "Load.48 (MWh
 
   On a alors la confirmation que Load.48 est une feature essentielle pour la prévision puisque ce simple modèle explique déjà 89% de la variance. Pour autant, les résidus ne semblent clairement pas suivre une loi normale centrée ce qui laisse présager d'amélioration. Pour trouver ces améliorations, on continue de remonter l'ordre d'importance des features. On effectue un nouveau GAM qui est le précedant auquel on a rajouter une dépendance en les températures lissées maximales **Temp_s95_max** et **Temp_s99_max**. Une fois encore, on remarque que les dépendances semblent être des fonctions polynomiales de faibles degrés. On choisit alors une assez faible valeur pour **k** à savoir **k=5** pour les deux.
 
-```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3,fig.align='center'}
 g2 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr"), data=d_ent_ouvre)
 fit2 <- getViz(g2, nsim = 50)
 plot(d_ent_ouvre$Load, g2$residuals, main="Résidus pour g2", xlab="Consommation (MWh)",ylab="Résidus", pch=16)
@@ -279,7 +279,7 @@ plot(sm(fit2, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title=""
 
 On obtient une explication de la variance de près de 92% donc l'amélioration est encore notable. Dans le prochain GAM, on ajoute toutes les données discrète à savoir l'heure via **tod** et le jour via **WeekDays**. Et compte-tenu du fait qu'à terme on veut faire un model par heure, on choisit **k=24** pour **tod**
 
-```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3,fig.align='center'}
 g3 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr"), data=d_ent_ouvre)
 plot(d_ent_ouvre$Load, g3$residuals, main = "Résidus pour g3", xlab = "Consommation (MWh)", ylab = "Résidus" )
 fit3 <- getViz(g3, nsim = 50)
@@ -290,7 +290,7 @@ Pour ce troisième GAM, on obtient un R2 de plus de 97% et on remarque que même
 
 Pour le prochain ajout de feature (**toy** *time of the year*), on décide de ne plus choisir k en tâtonnant car la dépendance est moins facile à voir. On décide donc de trouver la valeur **k** par cross validation. Pour ce faire, on sépare les données en 10 blocks où 9 servent à l'entraînement et le dernier sert à obtenir une valeur du **RMSE**.
 
-```{r , echo=FALSE}
+```{r , echo=FALSE,fig.align='center'}
 load("A_AFFICHER/cross_validation")
 plot(K, rmseK, type='b', pch=20,main="",xlab="",ylab="")
 points(K[12],rmseK[12],col="red")
@@ -371,7 +371,7 @@ On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un t
 On peut alors le tester sur l'année suivante pour voir si notre GAM possède de bonnes propriétés de généralisation.
 
 
-###analyse plus fine : GAM avec découpage heure par heure
+### Analyse plus fine : GAM avec découpage heure par heure
 
 Dans cette partie, on ne se contente plus d'un unique modèle GAM pour faire nos prédictions mais on décide d'en faire un par heure. Ce choix est motivé d'une part par l'importance de la variable **tod** et d'autre part par le fait qu'on imagine qu'il y a de nombreuses intercorrélations entre l'heure et les autres features. Par exemple il est légitime d'imaginer que la **Température** ne va pas avoir le même effet sur la consommation la nuit qu'en journée. C'est donc pour toutes ces raisons que nous avons décidé de construire ces 24 models en réutilisant l'équation obtenu précédemment.
 
