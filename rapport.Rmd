@@ -251,21 +251,21 @@ $$ y_i=X_i\beta + f_1(x_{1,i})+ f_2(x_{2,i},x_{3,i})+...+ f_d(x_{d,i})+\epsilon_
 
   On vient de voir les forêts aléatoires, qui nous ont donné des résultats satisfaisants. Nous allons cependant améliorer notre performance avec des modèles GAM bien paramétrés. Pour ce faire, calculons tout d'abord un GAM variable par variable, pour comprendre l'influence de chacune sur la consommation et pour déterminer le degré de liberté optimal associé : il s'agit de bien décrire les données, sans pour autant faire un modèle trop complexe. L'étude des forêts nous a fourni l'importance des variables, que nous utilisons comme référence pour choisir lesquelles traiter en premier. Cette partie étant purement explicative, nous ne séprons par les différentes heures de la journée, pour simplifier l’interprétation. Le résultat obtenu est sensiblement le même.
   
-  On commence par la variable qui contient le plus d'information, à savoir **Load.48**, et on tatonne pour obtenir une bonne valeur de **k**. Ici ce choix n'était pas très dur à faire, car comme on le voit bien sur la figure de droite, la dépendance de **Load** en **Load.48** est quasi linéaire. On choisit donc **k** le plus petit possible, à savoir **k=3**.
+  On commence par la variable qui contient le plus d'information, à savoir **Load.48**, et on tatonne pour obtenir une bonne valeur de **k**. Ici ce choix n'était pas très dur à faire, car comme on le voit bien sur la figure de droite, la dépendance de **Load** en **Load.48** est quasi linéaire. On choisit donc **k** le plus petit possible, à savoir **k=3**. Cela donne le modèle **g1**.
 
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 
 g0 <- gam(Load~s(Load.48, k=3, bs="cr"), data=d_ent_ouvre)
 fit0 <- getViz(g0, nsim = 50)
-plot(d_ent_ouvre$Load, g0$residuals, main = "Résidus pour g0", xlab = "Consommation (MWh)", ylab = "Résidus" )
+plot(d_ent_ouvre$Load, g0$residuals, main = "Résidus pour g1", xlab = "Consommation (MWh)", ylab = "Résidus" )
 
 
 plot(sm(fit0, 1), n = 400, main = "dépendance en Load.48", xlab = "Load.48 (MWh)", ylab = "Consommation (MWh)")+ l_points() + l_fitLine() + l_ciLine()
 ```
 
 
-  On a alors la confirmation que Load.48 est une feature essentielle pour la prévision, puisque ce simple modèle explique déjà 89% de la variance. Pour autant, les résidus ne suivent manifestement pas une loi normale centrée, ce qui laisse présager d'améliorations possibles. Pour trouver ces améliorations, on poursuit dans la liste des covariables, par ordre d'importance. On effectue un nouveau GAM, formé du précedent auquel on a ajouté une dépendance en les températures lissées maximales **Temp_s95_max** et **Temp_s99_max**. Une fois encore, on remarque que les dépendances semblent être des fonctions polynomiales de faibles degrés. On choisit alors une assez faible valeur pour **k**, à savoir **k=5** pour les deux.
+  On a alors la confirmation que Load.48 est une feature essentielle pour la prévision, puisque ce simple modèle explique déjà 89% de la variance. Pour autant, les résidus ne suivent manifestement pas une loi normale centrée, ce qui laisse présager d'améliorations possibles. Pour trouver ces améliorations, on poursuit dans la liste des covariables, par ordre d'importance. On effectue un nouveau GAM **g2**, formé du précedent auquel on a ajouté une dépendance en les températures lissées maximales **Temp_s95_max** et **Temp_s99_max**. Une fois encore, on remarque que les dépendances semblent être des fonctions polynomiales de faibles degrés. On choisit alors une assez faible valeur pour **k**, à savoir **k=5** pour les deux.
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3,fig.align='center'}
 g2 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr"), data=d_ent_ouvre)
@@ -277,7 +277,7 @@ plot(sm(fit2, 3), n = 400) + l_points() + l_fitLine() + l_ciLine()+labs(title=""
 
 ```
 
-On obtient une explication de la variance de près de 92%, donc l'amélioration est encore notable. Dans le GAM suivant, on ajoute toutes les données discrètes, à savoir l'heure via **tod** et le jour via **WeekDays**. Et compte tenu du fait qu'à terme on veut faire un modèle par heure, on choisit **k=24** pour **tod**
+On obtient une explication de la variance de près de 92%, donc l'amélioration est encore notable. Dans le GAM suivant, appelé **g3** on ajoute toutes les données discrètes, à savoir l'heure via **tod** et le jour via **WeekDays**. Et compte tenu du fait qu'à terme on veut faire un modèle par heure, on choisit **k=24** pour **tod**
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3,fig.align='center'}
 g3 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr"), data=d_ent_ouvre)
@@ -306,9 +306,9 @@ equation <- Load ~ s(Load.48, k=3, bs="cr") + s(Temp_s95_max, k=5, bs="cr") + s(
 
 
 
-### Premier modèle GAM (sans découpage heure par heure)
+### 4.2 Premier modèle GAM (sans découpage heure par heure)
 
-Dans cette partie, on va utiliser l'équation obtenue précédemment et analyser les propriétés de généralisation de ce GAM en le testant sur l'année suivante. Mais avant cela, on justifie notre choix de base de spline par cross-validation. 
+Dans cette partie, on va utiliser l'équation obtenue précédemment pour obtenir le modèle **gtot**, et analyser les propriétés de généralisation de ce GAM en le testant sur l'année suivante. Mais avant cela, on justifie notre choix de base de spline par validation croisée. 
 
 ```{r, echo=FALSE}
 load("A_AFFICHER/splines_basis")
@@ -316,9 +316,9 @@ load("A_AFFICHER/splines_basis")
 knitr::kable(tableau,colors = c("black", "white"))
 ```
 
-On note que les résultats sont sensiblement les mêmes pour thin plate regression et pour cubic regression et légèrement moins bon pour cyclic cubic regression. On décide donc a posteriori que notre choix de base **cr** est justifié car c'est celle qui donne le meilleur RMSE. Toutefois, on fait remarquer qu'une étude précise nécessiterait de faire ce travail pour trouver la meilleure base de splines adaptée à chaque variables. Cependant nous n'avons pas jugé cela pertinent aux vues des faibles différences de performance. 
+On note que les résultats sont sensiblement les mêmes pour thin plate regression et pour cubic regression, et légèrement moins bons pour cyclic cubic regression. On décide donc a posteriori que notre choix de base **cr** est justifié, car c'est celle qui donne le RMSE estimé le plus faible. Une étude précise nécessiterait de faire ce travail séparément pour chaque heure de la journée, cependant nous n'avons pas jugé cela pertinent au vu des faibles différences entre les valeurs obtenues. 
 
-Désormais, on peut commencer à analyser les performances de notre GAM dans le cas où on ne fait pas encore un modèle heure par heure. On plot donc les prévisions produites par notre model sur l'année 2019.
+Désormais, on peut commencer à analyser les performances de notre GAM dans le cas où l'on ne fait pas encore un modèle par heure. Affichons les prévisions de notre modèle sur l'année 2019.
 
 ```{r, echo=FALSE}
 equation<-Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr")+s(Temp_s95_min, k=5, bs="cr")+s(Temp_s99_min, k=5, bs="cr")+s(Temp_s95, k=5, bs="cr")+s(Temp_s99, k=5, bs="cr")+WeekDays+s(tod, k=24, bs="cr")+s(toy,k=14)+Christmas_break+Summer_break
@@ -332,10 +332,10 @@ predictgam<-predict(gtot,newdata=d_test_ouvre)
 plot(d_test_ouvre$Date,d_test_ouvre$Load, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="black") 
 lines(d_test_ouvre$Date,d_test_ouvre$Forecast_RTE_intraday, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="blue") 
 lines(d_test_ouvre$Date,predictgam, xlab = "Date", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0), col="red")
-legend(x="bottomright", legend=c("Donnée Réel","RTE","GAM"), col=c("black","blue","red"), pch=c(15,15,15))
+legend(x="bottomleft", legend=c("Conso réelle","RTE","GAM"), col=c("black","blue","red"), pch=c(15,15,15))
 ```
 
-On voit dans ce plot annuelle que notre prédiction semble globalement correspondre à la consommation réelle, pour autant cette échelle ne permet pas une analyse fine donc on va s'attarder plutôt sur un mois en particulier, on choisit arbitrairement le mois de Décembre en nous disant que c'est un mois intéressant dans le sens où la prévision est près d'un an après la dernière donnée d'entraînement et que la consommation est assez mouvementée en décembre notamment de par les chutes de température.
+On voit dans cette courbe annuelle que notre prédiction semble assez bien correspondre à la consommation réelle. Pour autant, cette échelle ne permet pas une analyse fine, et il convient de se concentrer sur un mois seulement, par exemple décembre, qui est un mois intéressant car la prévision est réalisée près d'un an après la dernière donnée d'entraînement, et l'on peut observer des pics de consommation dus à des chutes de température.
 
 
 ```{r, echo=FALSE}
@@ -366,14 +366,30 @@ fittot <- getViz(gtot, nsim = 50)
 
 ```
 
-On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un trop grand nombre de paramètres. De plus, les résidus ressemblent désormais bien à du bruit et donc semblent ne plus réellement contenir d'information.
+On obtient une variance expliquée de l'ordre de 98% sans pour autant avoir un trop grand nombre de paramètres. De plus, les résidus ressemblent désormais bien à du bruit et donc semblent contenir assez peu d'information, si ce n'est que la variance semble plus faible quand la consommation est plus faible. Ceci reflète probablement une tendance des données : lorsque la consommation est plus faible, en particulier la nuit, les sources de consommation ont tendance à être plus régulières, parce que générées par une activité professionnelle (usines en marche toute la nuit par exemple).
 
-On peut alors le tester sur l'année suivante pour voir si notre GAM possède de bonnes propriétés de généralisation.
+Nous calculons un MAPE égal à 2.33 pour **gtot**, ce qui est nettement plus élevé que le MAPE des forets avec découpage par heure. En affichant le MAPE par heure nous obtenons la courbe suivante.
+
+```{r, include=TRUE, echo=FALSE}
+H <- 23
+
+mape_gtot <- c()
+for(i in c(0:H)){
+  assign("x", predict(gtot, newdata = eval(parse(text=paste("d_test_ouvre", i, sep="_")))))
+  mape_gtot <- c(mape_gtot, mape(x, eval(parse(text=paste("d_test_ouvre", i, sep="_")))$Load))
+}
+
+plot(mape_gtot, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,3.5), lab=c(5,4,0), col="blue")
+lines(mape_ouvre_RTE, col="red")
+legend(x="bottomright", legend=c("gtot","RTE"), col=c("blue","red"), pch=c(15,15))
+
+```
 
 
-### Analyse plus fine : GAM avec découpage heure par heure
 
-Dans cette partie, on ne se contente plus d'un unique modèle GAM pour faire nos prédictions mais on décide d'en faire un par heure. Ce choix est motivé d'une part par l'importance de la variable **tod** et d'autre part par le fait qu'on imagine qu'il y a de nombreuses intercorrélations entre l'heure et les autres features. Par exemple il est légitime d'imaginer que la **Température** ne va pas avoir le même effet sur la consommation la nuit qu'en journée. C'est donc pour toutes ces raisons que nous avons décidé de construire ces 24 models en réutilisant l'équation obtenu précédemment.
+### 4.3 Analyse plus fine : GAM avec découpage par heure
+
+Dans cette sous-partie, on ne se contente plus d'un unique GAM pour faire nos prédictions, mais on décide de calculer un modèle par heure, pour les raisons exposées dans la partie 1.3. Nous construisons donc 24 modèles en réutilisant l'équation obtenue précédemment.
 
 
 ```{r, echo=FALSE}
@@ -394,15 +410,16 @@ for(i in c(1:H))
 ```
 
 
-Pour des raisons de visibilité, nous affichons l'attache aux données et la prédiction pour le modèle **gam_ouvre_12** et par conséquent nous limitons notre analyse à midi. Dans ces plot, on remarque que l'on fit presque parfaitement les données d'entraînement ce qui pourrait présager d'un potentiel surapprentissage. Pour autant, il n'en est rien puisqu'on voit dans la figure de droite que notre prédiction est elle aussi très proche de la consommation effective. On peut dors et déjà dire que ce découpage par heure est une réussite. 
+Pour avoir un repère visuel (mais nous ne le ferons pas pour les autres modèles, pour ne pas alourdir le rapport), nous affichons l'attache aux données et la prédiction  du modèle **gam_ouvre_12**. Dans ces courbes, on remarque que l'on colle presque parfaitement aux données d'entraînement. Le modèle ne semble cependant pas avoir surappris, car d'après la figure de droite, sa prédiction est elle aussi très proche de la consommation effective. Le découpage par heure semble bien fonctionner.
 
 ```{r, echo=FALSE, include=TRUE}
 # midi
 
-rmse(d_test_ouvre_12$Load-pred_ouvre_12)
-mape(d_test_ouvre_12$Load,pred_ouvre_12)
+#rmse(d_test_ouvre_12$Load-pred_ouvre_12)
+#mape(d_test_ouvre_12$Load,pred_ouvre_12)
 
 # affichage sur les données d'entraînement
+par(mfrow=c(1,2))
 d_plot_ouvre_12 <- filter(d_ent_ouvre_12, Year=="2018")
 g_plot_ouvre_12 <- predict(gam_ouvre_cr_12, newdata = d_plot_ouvre_12)
 plot(d_plot_ouvre_12$toy, d_plot_ouvre_12$Load, main = "Entraînement jours ouvrés à midi",axes=FALSE, xlab = "Date (année 2018)", ylab = "Consommation (MWh)", type="l", lab=c(5,4,0),ylim=c(min(d_plot_ouvre_12$Load)-5000,max(d_plot_ouvre_12$Load)+5000))
@@ -424,7 +441,8 @@ fit1 <- getViz(gam_ouvre_cr_12, nsim = 50)
 # ordre variables : Load48, Temp95, Temp99, Temp, toy
 
 ```
-On peut tout de même avoir envie de comparer ces performances avec notre précédant GAM. Même si ce n'est pas évident à cette échelle, on remarque tout de même une légère amélioration de la version où on décomposer heure par heure même si la différence est telle qu'il faudrait un indicateur tel que le **MAPE** pour vraiment lequel de ces deux models est meilleur à midi.
+
+Pour comparer la performance en validation de **gam_ouvre_12** avec celle notre précédant GAM **gtot**, nous ajoutons la prédiction de ce dernier à la courbe en validation. 
 
 ```{r, echo=FALSE, include=TRUE}
 # midi
@@ -442,8 +460,8 @@ fit1 <- getViz(gam_ouvre_cr_12, nsim = 50)
 
 ```
 
-
-Comme dans la partie précédante, on s'intéresse aux fonctions des différentes features. On remarque alors que la dépendance est globalement la même qu'avec le GAM sans découpage heure par heure ce qui justifie le fait de ne pas avoir à refaire le travail sur le choix de **k** et de la base de splines.
+Même si ce n'est pas évident à cette échelle, on remarque tout de même une légère amélioration de la version par heure, différence qui sera bien plus visible encore sur le MAPE.
+Comme dans la partie précédente, penchons-nous sur les différentes splines calculées par **gam_ouvre_12**. On remarque que la dépendance est proche de celle du GAM sans découpage heure par heure, ce qui conforte notre choix d'avoir gardé les **k** et la base de splines déterminés dans les deux sous-parties précédentes.
 
 ```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 plot(sm(fit1, 1), n = 400) + l_points() + l_fitLine() + l_ciLine()
@@ -453,7 +471,8 @@ plot(sm(fit1, 4), n = 400) + l_points() + l_fitLine() + l_ciLine()
 plot(sm(fit1, 5), n = 400) + l_points() + l_fitLine() + l_ciLine()
 
 ```
-Maintenant, il s'agit d'obtenir le **MAPE** en fonction de leur de ces GAMs et de le comparer à des références, ici on prend la prévision *dayahead* de **RTE** ainsi que celle du GAM sans découpage. La première remarque que l'on peut faire est que 
+
+Nous pouvons enfin afficher le **MAPE** de ces GAMs par heure, et le comparer à la prévision *dayahead* de **RTE**.
 
 ```{r, echo=FALSE}
 # mape_ouvre  # max = 1.55, min = 1.33
@@ -480,7 +499,7 @@ legend(x="bottomright", legend=c("GAM","RTE"), col=c("blue","red"), pch=c(15,15)
 
 ```
 
-
+On observe que les GAMs par heure sont à peu près aussi bons que la prévision de RTE, et nettement meilleurs que **gtot**, dont le MAPE oscillait entre 2 et 3%.
 
 ## 5 Boosting
 
