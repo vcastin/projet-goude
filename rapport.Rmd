@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-Prédire la consommation d'électricité en France est un problème central, notamment pour la gestion du parc de production d'électricité français, dont le nucléaire, énergie peu modulable, représente une part importante. Dans ce projet, nous abordons cette question, qui rentre dans le cadre de la prévision de séries temporelles, en faisant appel à un large éventail de méthodes utilisant le machine learning.
+Prédire la consommation d'électricité en France est un problème central, notamment pour la gestion du parc de production d'électricité français, dont le nucléaire, énergie peu modulable, représente une part importante. Dans ce projet, nous abordons cette question, qui rentre dans le cadre de la prévision de séries temporelles, en faisant appel à un large éventail de méthodes utilisant le machine learning. Notre github est disponible à l'adresse https://github.com/vcastin/projet-goude.
 
 
 ## 1 Importation et prétraitement des données
@@ -732,7 +732,7 @@ Par construction, les différents quantiles sont de simples translations de notr
 
 ### 7.3 QGAM
 
-Comme nous l'avons souligné, le modèle décrit dans la partie précédente reste une approche assez naïve, car dans notre cas, il est clair que la variance n'est pas la même selon que la consommation est importante ou non. Par conséquent, nous avons choisi d'utiliser des QGAM, suivant un procédé qui s’affranchit du cadre paramétrique dans lequel les GAM sont contraints en utilisant des méthodes de calibrations Bayesiennes (@Manual) ce qui permet à la variance de ne plus être une simple constante. Pour estimer un quantile fixé de la loi des données, on entraîne notre modèle avec une fonction de perte classique pour ce genre de problème, la Pinball Loss : 
+Comme nous l'avons souligné, le modèle décrit dans la partie précédente reste une approche assez naïve, car dans notre cas, il est clair que la variance n'est pas la même selon que la consommation est importante ou non. Par conséquent, nous avons choisi d'utiliser des QGAM, suivant un procédé qui s’affranchit du cadre paramétrique dans lequel les GAM sont contraints en utilisant des méthodes de calibrations Bayesiennes -- voir l'article *Bayesian Nonparametric Quantile Regression Modeling in R*, de Fasiolo et al. (2021) -- ce qui permet à la variance de ne plus être une simple constante. Pour estimer un quantile fixé de la loi des données, on entraîne notre modèle avec une fonction de perte classique pour ce genre de problème, la Pinball Loss : 
 
 ```{r, echo=FALSE}
 n <- 1000
@@ -913,17 +913,18 @@ Dans le premier graphique, on remarque que globalement tous nos experts ont du p
 
 
 
-@Manual{R-base,
-  title = {qgam: Bayesian Nonparametric Quantile Regression Modeling in R},
-  author = {{Matteo Fasiolo, Simon N. Wood, Margaux Zaffran, Raphaël Nedellec, Yannig Goude}},
-  year = {2021},
-  url = {https://www.jstatsoft.org/article/view/v100i09},
+
   
   
 ## 9 Conclusion
 
-Nous avons donc au travers de ce projet découvert et utilisé de nombreuses méthodes de Machine Learning. Notre problème étant assez générique et nos données de très bonnes qualités, toutes ces méthodes ont données de très bon résultats. En effet, nos plus mauvais prédicteurs avaient un MAPE de l'ordre de 3% ce qui est totalement acceptable tandis que nos meilleurs arrivent presque à passer en dessous de la barre symbolique des 1%. Cela dit, il faut rappeler que nous avons éviter les données problématique pour ne pas avoir à multiplier d'avantage le nombre de modèles mais que même si nous l'avions fait il y a fort à parier que nos performances seraient tout de même affectées. Outre la tâche de prédiction, on peut également souligné la partie prévision en loi avec les qgam qui nous ont données d'assez bons résultats malgré une année de test assez particulièrement au niveau du comportement de ces derniers.
-}
+Nous avons au travers de ce projet découvert et utilisé de nombreuses méthodes de Machine Learning. La consommation électrique étant un phénomène relativement stable, et nos données de très bonne qualité, toutes ces méthodes ont donné de très bons résultats. Nos plus mauvais prédicteurs ont en effet un MAPE de l'ordre de 3%, ce qui est tout à fait acceptable, tandis que les meilleurs passent presque sous la barre symbolique des 1%.
+
+Un choix crucial a été de séparer nos données en fonction de l'heure, et d'entraîner 24 modèles différents, ce qui a conduit à une amélioration significative des performances de nos modèles. Rappelons également que nous avons supprimé les jours fériés de notre jeu de données. Une piste future serait de prédire spécifiquement la consommation des jours fériés, le principal obstacle étant que l'on dispose de très peu de données.
+
+Nous avons enfin découvert la prévision en loi et les QGAM, qui sont venus enrichir notre palette d'outils de prévision des séries temporelles, et ont donné des résultats satisfaisants, en particulier pour l'agrégation d'experts.
+
+
 
 
 
