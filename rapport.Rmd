@@ -867,7 +867,7 @@ On voit effectivement que nous testons nos données sur une année marquée par 
 load("MODELES/agregation.rda")
 ```
 
-Dans cette dernière partie, nous procédons à l'agrégation de tous les experts entraînés précédemment, dans l'espoir d'obtenir une combinaison convexe qui soit plus performante que chaque modèle séparément. Nous utilisons l'algorithme MLpol du package opera. Les experts que nous donnons à l'algorithme sont les suivants :
+Dans cette dernière partie, nous procédons à l'agrégation de tous les experts entraînés précédemment, dans l'espoir d'obtenir une combinaison convexe qui soit plus performante que chaque modèle séparément. Nous utilisons l'algorithme *MLpol* du package *opera*. Les experts que nous donnons à l'algorithme sont les suivants :
 
 - foret aléatoire (partie 3.2)
 - GAM (partie 4.3)
@@ -878,12 +878,12 @@ Dans cette dernière partie, nous procédons à l'agrégation de tous les expert
 
 auxquels on ajoute :
 
-- QGAM aux quantiles 0.4, 0.45, 0.5, 0.55
+- QGAM aux quantiles 0.4, 0.45, 0.5, 0.55 (partie 7.3)
 - 5 modèles GAM obtenus par bagging.
 
 Nous nous sommes limités à 5 modèles obtenus par bagging pour des raisons de temps de calcul, même si 10 aurait probablement été encore mieux.
 
-On commence l'analyse de notre agrégation par la figure ci-dessous du **MAPE** en fonction de l'heure que l'on compare à celui donné par **RTE dayahead** et la première chose marquante c'est que l'on a enfin un modèle meilleur que RTE !
+Nous obtenons la figure ci-dessous du **MAPE** de la combinaison convexe obtenue par agrégation en fonction de l'heure, à comparer à celui donné par **RTE dayahead**. La première chose marquante est que nous avons enfin un modèle meilleur que RTE !
 
 ```{r, echo=FALSE,fig.align='center'}
 plot(mape_agg, main = "MAPE en fonction de l'heure, jours ouvrés (année 2019)", xlab = "Heure", ylab = "MAPE (%)", type="l", ylim= c(0,1.8), lab=c(5,4,0), col="blue")
@@ -892,7 +892,7 @@ lines(mape_ouvre_RTE, col="red")
 legend(x="bottomright", legend=c("agregation","RTE"), col=c("blue","red"), pch=c(15,15))
 ```
 
-En effet, on voit que nous sommes légèrement en-dessous de la prédiction de RTE en termes d'erreur même si cela se joue à quelques 0.1% près. On remarque également que c'est la nuit que l'écart est le plus important mais nous manquons d'information sur comment fonctionne le prédicteur de RTE pour pouvoir interpréter cela. Toutefois, le fait qu'on ait de meilleurs performances que RTE est à prendre avec des pincettes car les données ne sont pas exactement les mêmes en particulier pour les données météo. Nous disposons des mesure effectives alors que RTE n'avait à disposition que des prévisions ce qui augmente le facteur aléatoire.
+En effet, nous sommes légèrement en dessous de la prédiction de RTE en termes d'erreur, même si cela se joue à quelques 0.1% près. On remarque également que c'est la nuit que l'écart est le plus important, mais nous manquons d'information sur comment fonctionne le prédicteur de RTE pour pouvoir interpréter cela. Rappelons enfin que le fait que nos performances soient meilleures que celles de RTE est à relativiser, car les données utilisées ne sont pas exactement les mêmes, en particulier pour les données météo. Nous disposons des mesure effectives alors que RTE n'avait à disposition que des prévisions, ce qui augmente l'aléa de leur prédiction.
 
 Penchons-nous ensuite plus en détail sur une heure de la journée, par exemple midi. Nous obtenons les courbes suivantes.
 
@@ -900,7 +900,7 @@ Penchons-nous ensuite plus en détail sur une heure de la journée, par exemple 
 plot(agg.online_12, pause=F)
 ```
 
-Dans ce premier graphique, on remarque que globalement tous nos experts ont du poids à l'exception peut-être de **foret** et du **qgam0.55**. En ce qui concerne la forêt, cela doit venir du fait que c'est assez mauvais prédicateur. Pour le **qgam** de quantile supérieur cela doit être pour la même raison que l'observation que nous avons faites pour les qGAM à savoir que 2019 était une année où certains quantiles étaient décalés. On note également que les prédicteurs obtenus par **Boosting** sont ceux qui sont le plus utilisés ce qui une fois encore s'explique par le fait que ce sont les prédicteurs les plus performants déjà du point de vu individuel.
+Dans le premier graphique, on remarque que globalement tous nos experts ont du poids à l'exception peut-être de **foret** et du **qgam0.55**. En ce qui concerne la forêt, cela doit venir du fait que c'est assez mauvais prédicteur. Pour le **qgam** de quantile supérieur cela doit être pour la même raison que l'observation que nous avons faites pour les QGAM, c'est-à-dire que 2019 était une année où certains quantiles étaient décalés. On note également que les prédicteurs obtenus par boosting sont ceux qui sont les plus utilisés, ce qui peut s'expliquet par leurs très bonnes performances individuelles. Enfin, nous avons observé une certaine diversité dans le choix des experts en fonction des heures. Pour les données à minuit par exemple, le prédicteur **qgam0.4** a un poids presque égal à 1.
 
 
 
