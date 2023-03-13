@@ -267,7 +267,7 @@ plot(sm(fit0, 1), n = 400, main = "dépendance en Load.48", xlab = "Load.48 (MWh
 
   On a alors la confirmation que Load.48 est une feature essentielle pour la prévision, puisque ce simple modèle explique déjà 89% de la variance. Pour autant, les résidus ne suivent manifestement pas une loi normale centrée, ce qui laisse présager d'améliorations possibles. Pour trouver ces améliorations, on poursuit dans la liste des covariables, par ordre d'importance. On effectue un nouveau GAM **g2**, formé du précedent auquel on a ajouté une dépendance en les températures lissées maximales **Temp_s95_max** et **Temp_s99_max**. Une fois encore, on remarque que les dépendances semblent être des fonctions polynomiales de faibles degrés. On choisit alors une assez faible valeur pour **k**, à savoir **k=5** pour les deux.
 
-```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3,fig.align='center'}
+```{r , echo=FALSE,fig.show='hold' ,fig.width = 4, fig.height = 3}
 g2 <- gam(Load~s(Load.48, k=3, bs="cr")+s(Temp_s95_max, k=5, bs="cr")+s(Temp_s99_max, k=5, bs="cr"), data=d_ent_ouvre)
 fit2 <- getViz(g2, nsim = 50)
 plot(d_ent_ouvre$Load, g2$residuals, main="Résidus pour g2", xlab="Consommation (MWh)",ylab="Résidus", pch=16)
@@ -914,6 +914,11 @@ Dans ce premier graphique, on remarque que globalement tous nos experts ont du p
   author = {{Matteo Fasiolo, Simon N. Wood, Margaux Zaffran, Raphaël Nedellec, Yannig Goude}},
   year = {2021},
   url = {https://www.jstatsoft.org/article/view/v100i09},
+  
+  
+## 9 Conclusion
+
+Nous avons donc au travers de ce projet découvert et utilisé de nombreuses méthodes de Machine Learning. Notre problème étant assez générique et nos données de très bonnes qualités, toutes ces méthodes ont données de très bon résultats. En effet, nos plus mauvais prédicteurs avaient un MAPE de l'ordre de 3% ce qui est totalement acceptable tandis que nos meilleurs arrivent presque à passer en dessous de la barre symbolique des 1%. Cela dit, il faut rappeler que nous avons éviter les données problématique pour ne pas avoir à multiplier d'avantage le nombre de modèles mais que même si nous l'avions fait il y a fort à parier que nos performances seraient tout de même affectées. Outre la tâche de prédiction, on peut également souligné la partie prévision en loi avec les qgam qui nous ont données d'assez bons résultats malgré une année de test assez particulièrement au niveau du comportement de ces derniers.
 }
 
 
